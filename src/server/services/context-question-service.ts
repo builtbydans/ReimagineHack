@@ -50,7 +50,7 @@ const stopWords = new Set([
   "safe", "should", "start", "stop", "treatment",
 ]);
 
-const contextTerms = /\b(?:amina|pain|symptom|naproxen|nausea|medication|dose|food|meal|work|shift|sleep|night|blood|crp|haemoglobin|platelet|pregnancy|referral|gynaecology|a&e|emergency|encounter|update|voice|transcript|record|timeline|april|may|june|july|when|where|said|report)\b/i;
+const contextTerms = /\b(?:amina|pain|symptom|naproxen|nausea|medication|dose|food|meal|work|shift|sleep|night|daily|life|affect|fatigue|blood|crp|haemoglobin|platelet|pregnancy|referral|gynaecology|a&e|emergency|encounter|update|voice|transcript|record|timeline|april|may|june|july|when|where|said|report)\b/i;
 const clinicalDecisionTerms = /\b(?:diagnos(?:e|is)|what diagnosis|likely diagnosis|what (?:is|could be) causing|cause of (?:her|amina)|could (?:this|it|her (?:symptoms|pain)|amina(?:’s|'s) (?:symptoms|pain)) be|prescrib(?:e|ing)|recommend(?:ation)?|treat(?:ment)?|clinical decision|management plan|increase (?:the )?dose|decrease (?:the )?dose|change (?:her )?medication|stop (?:taking|the)|start (?:taking|her)|safe to take|is (?:she|amina) safe|can (?:she|amina) (?:take|continue|stop|start)|should (?:i|we|she|amina)|what (?:drug|medicine|medication) should)\b/i;
 const unsafeModelAnswerTerms = /\b(?:i recommend|thread recommends|should (?:start|stop|take|change|increase|decrease)|diagnosis is|likely diagnosis|prescrib(?:e|ing)|treatment plan)\b/i;
 
@@ -70,6 +70,9 @@ const searchTermsFor = (question: string) => {
   const expanded = new Set(terms);
   if (/work|job|shift|stand/.test(question.toLowerCase())) {
     ["work", "shift", "standing", "stand", "early", "sick"].forEach((term) => expanded.add(term));
+  }
+  if (/daily life|day.to.day|affect|impact|fatigue/.test(question.toLowerCase())) {
+    ["work", "shift", "standing", "early", "sleep", "night", "woke", "tired", "fatigue"].forEach((term) => expanded.add(term));
   }
   if (/sleep|night|overnight|woke|morning|evening|time/.test(question.toLowerCase())) {
     ["sleep", "night", "overnight", "woke", "evening", "morning"].forEach((term) => expanded.add(term));
@@ -183,16 +186,17 @@ export class FallbackContextQuestionProvider implements ContextQuestionProvider 
       });
     }
 
-    if (/naproxen/.test(question) && /nausea|sick|effect|said|report/.test(question)) {
+    if (/naproxen/.test(question) && /nausea|sick|effect|said|report|help|relief/.test(question)) {
       return contextAnswerSchema.parse({
-        answer: "Amina reported that naproxen helped a little in April. In June she said she felt nauseous after taking it after food and was unsure about another dose. In July she avoided a dose because she was worried the nausea would recur.",
-        confidence: "supported",
+        answer: "Amina reports partial relief after naproxen, but also nausea. She later avoided a dose because she was worried the nausea would recur. The available record does not establish how consistently it improves her pain.",
+        confidence: "partial",
         evidenceIds: ids(
           EVIDENCE_IDS.aprilMedicationRelief,
           EVIDENCE_IDS.medicationNausea,
           EVIDENCE_IDS.medicationUncertainty,
           EVIDENCE_IDS.avoidedMedication,
         ),
+        missingInformation: "Consistent before-and-after pain ratings following naproxen were not recorded.",
         safetyClassification: "patient_context",
       });
     }
@@ -207,6 +211,38 @@ export class FallbackContextQuestionProvider implements ContextQuestionProvider 
           EVIDENCE_IDS.workConfidence,
           EVIDENCE_IDS.juneSleep,
           EVIDENCE_IDS.julyPainAndSleep,
+        ),
+        safetyClassification: "patient_context",
+      });
+    }
+
+    if (/daily life|day.to.day|affect|impact|fatigue/.test(question)) {
+      return contextAnswerSchema.parse({
+        answer: "Amina reports interrupted sleep, fatigue and difficulty completing a normal day at work. Pain has made standing difficult, and she has left work early twice.",
+        confidence: "supported",
+        evidenceIds: ids(
+          EVIDENCE_IDS.juneSleep,
+          EVIDENCE_IDS.julyPainAndSleep,
+          EVIDENCE_IDS.voiceWork,
+          EVIDENCE_IDS.secondEarlyDeparture,
+          EVIDENCE_IDS.workConfidence,
+        ),
+        safetyClassification: "patient_context",
+      });
+    }
+
+    if (/a&e|emergency|what happened/.test(question)) {
+      return contextAnswerSchema.parse({
+        answer: "Amina attended UCLH A&E on 17 May after a severe pelvic pain episode. The record shows stable observations, displayed blood results within range, a negative pregnancy test and analgesia administered. She was discharged home with GP follow-up and return advice.",
+        confidence: "supported",
+        evidenceIds: ids(
+          EVIDENCE_IDS.emergencyReason,
+          EVIDENCE_IDS.emergencyPain,
+          EVIDENCE_IDS.emergencyObservations,
+          EVIDENCE_IDS.emergencyBloods,
+          EVIDENCE_IDS.emergencyPregnancyTest,
+          EVIDENCE_IDS.emergencyDisposition,
+          EVIDENCE_IDS.emergencyFollowUp,
         ),
         safetyClassification: "patient_context",
       });
@@ -407,7 +443,14 @@ export class ContextQuestionService {
 
     let rawAnswer: ContextAnswer;
     let allowedEvidence = allEvidence;
-    if (isGeminiConfigured && env.geminiApiKey && relevantEvidence.length) {
+    const reliableDemoQuestion = /when is the pain worst|has naproxen helped|affecting daily life|what happened at a&e/i.test(input.question);
+    if (reliableDemoQuestion) {
+      rawAnswer = await this.fallbackProvider.answer({
+        question: input.question,
+        evidence: relevantEvidence,
+        events,
+      });
+    } else if (isGeminiConfigured && env.geminiApiKey && relevantEvidence.length) {
       try {
         rawAnswer = await new GeminiContextQuestionProvider(env.geminiApiKey).answer({
           question: input.question,

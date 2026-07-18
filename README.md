@@ -1,18 +1,18 @@
-# Thread
+# Threads
 
-> Healthcare only sees snapshots. Chronic illness is a continuous story. Thread connects the moments in between.
+> Healthcare only sees snapshots. Chronic illness is a continuous story. Threads connects the moments in between.
 
-Thread is an always-on health context platform for people living with chronic conditions. It connects patient updates, healthcare encounters, medication changes, results, and evidence-linked AI-organised observations into one longitudinal story.
+Threads is an always-on health context platform for people living with chronic conditions. It connects patient updates, healthcare encounters, medication changes, results, and evidence-linked AI-organised observations into one longitudinal story.
 
 The V1 demo follows **Amina Khan**, a 32-year-old woman living with endometriosis. Every person, encounter, observation, result, and quote in this repository is synthetic.
 
-Thread is not an AI doctor. It does not diagnose, recommend treatment, provide clinical certainty, or monitor emergencies. Its purpose is to preserve the patient’s voice, organise fragmented context, and help every appointment begin with context instead of reconstruction.
+Threads is not an AI doctor. It does not diagnose, recommend treatment, provide clinical certainty, or monitor emergencies. Its purpose is to preserve the patient’s voice, organise fragmented context, and help every appointment begin with context instead of reconstruction.
 
 ## The problem
 
 Chronic illness is continuous, while healthcare encounters are episodic. Important details are often distributed across memory, written notes, voice updates, GP reviews, emergency visits, prescriptions, referrals, and test results. Patients repeatedly reconstruct their history, and clinicians often begin appointments without the story between encounters.
 
-Thread brings those moments together while keeping three source classes visibly separate:
+Threads brings those moments together while keeping three source classes visibly separate:
 
 - **Patient-reported:** written updates, voice updates, symptoms, functional impact, and medication concerns.
 - **Imported clinical record:** synthetic encounter notes, observations, results, prescriptions, and referrals.
@@ -20,7 +20,7 @@ Thread brings those moments together while keeping three source classes visibly 
 
 ## Product proposition
 
-**Healthcare only sees snapshots. Chronic illness is a continuous story. Thread connects the moments in between.**
+**Healthcare only sees snapshots. Chronic illness is a continuous story. Threads connects the moments in between.**
 
 Every appointment should start with context, not reconstruction.
 
@@ -28,7 +28,7 @@ Every appointment should start with context, not reconstruction.
 
 ### Patient experience
 
-- Calm, mobile-first home at `/patient` with a current Thread observation, next appointment, recent story, and multiple update methods.
+- Calm, mobile-first home at `/patient` with a current Threads observation, next appointment, recent story, and multiple update methods.
 - Full filterable timeline at `/patient/timeline`, including a clearly labelled patient-reported pain trend.
 - Written and browser `MediaRecorder` update flow at `/patient/update` with processing states, structured review, and local persistence.
 - Appointment preparation at `/patient/prepare` with selectable priorities, an evidence-linked brief, ready state, and demo share/export result.
@@ -52,7 +52,7 @@ Every appointment should start with context, not reconstruction.
 ## Demo flow
 
 1. Open the patient home.
-2. Show the current “What Thread has noticed” observation.
+2. Show the current “What Threads has noticed” observation.
 3. Add a written or voice update.
 4. Review the organised details and show the update joining the timeline.
 5. Open the synthetic UCLH A&E encounter.
@@ -188,12 +188,12 @@ Missing provider keys do not break pages or APIs. Repository failures in develop
 
 ## API routes
 
-| Route | Purpose | Current fallback |
-| --- | --- | --- |
-| `GET/POST/PUT /api/patient-updates` | List, organise, then persist the reviewed patient event without re-extraction | Deterministic structured update and fallback repository |
-| `POST /api/transcribe` | Receive an audio file through a server boundary | Seeded Urdu/English transcript when Runware is not configured |
-| `POST /api/encounters/import` | Simulate and persist an encounter import | Synthetic UCLH record |
-| `GET/POST/PATCH /api/appointment-brief` | Read, generate, and update brief status | Seeded evidence-linked brief |
+| Route                                   | Purpose                                                                       | Current fallback                                              |
+| --------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `GET/POST/PUT /api/patient-updates`     | List, organise, then persist the reviewed patient event without re-extraction | Deterministic structured update and fallback repository       |
+| `POST /api/transcribe`                  | Receive an audio file through a server boundary                               | Seeded Urdu/English transcript when Runware is not configured |
+| `POST /api/encounters/import`           | Simulate and persist an encounter import                                      | Synthetic UCLH record                                         |
+| `GET/POST/PATCH /api/appointment-brief` | Read, generate, and update brief status                                       | Seeded evidence-linked brief                                  |
 
 Route handlers validate inputs with Zod and return useful status/error payloads. Secrets are never read by client components.
 
@@ -203,7 +203,7 @@ The interface and implementations live in `src/server/services/ai-extraction-ser
 
 - `FallbackHealthExtractionService` produces deterministic, safety-bounded output for the Amina scenario.
 - `GeminiHealthExtractionService` is selected only when `GEMINI_API_KEY` is present and calls Gemini from the server.
-- Patient update extraction, Thread observations, and appointment brief generation share the `HealthExtractionService` interface so the UI does not know which provider is active.
+- Patient update extraction, Threads observations, and appointment brief generation share the `HealthExtractionService` interface so the UI does not know which provider is active.
 
 Before real-world use, provider output must receive stricter schema enforcement, prompt/version audit trails, evaluation, monitoring, and clinical safety review.
 
@@ -219,7 +219,7 @@ The browser records only when the user grants microphone access. Denial and unsu
 
 ## Safety boundaries
 
-Thread must never:
+Threads must never:
 
 - diagnose or present an organised pattern as a clinical conclusion;
 - recommend treatment or advise starting/stopping medication;
@@ -228,7 +228,7 @@ Thread must never:
 - hide whether information was patient-reported, imported, translated, or AI-organised;
 - claim direct NHS connectivity in this prototype.
 
-The interface uses phrases such as “Amina reports,” “imported record states,” “Thread organised,” and “may be useful to discuss.” Every AI-organised observation is marked **not clinically verified** and can reveal its evidence.
+The interface uses phrases such as “Amina reports,” “imported record states,” “Threads organised,” and “may be useful to discuss.” Every AI-organised observation is marked **not clinically verified** and can reveal its evidence.
 
 ## Synthetic-data disclaimer
 
@@ -251,5 +251,6 @@ This repository is a hackathon demonstration. Amina Khan is fictional. All organ
 
 ## Future vision
 
-Thread can become a longitudinal context layer across patient-reported experience and formal records: multilingual capture, FHIR-based imports, evidence-preserving summaries, clinician workflows, shared decision preparation, and outcome tracking. The core constraint remains unchanged: preserve source provenance, preserve the patient’s voice, and never turn AI-organised context into unsupported clinical certainty.
+Threads can become a longitudinal context layer across patient-reported experience and formal records: multilingual capture, FHIR-based imports, evidence-preserving summaries, clinician workflows, shared decision preparation, and outcome tracking. The core constraint remains unchanged: preserve source provenance, preserve the patient’s voice, and never turn AI-organised context into unsupported clinical certainty.
+
 # ReimagineHack

@@ -265,7 +265,7 @@ export const seedEvidenceReferences: EvidenceReference[] = [
     sourceKind: "patient_reported",
     label: "30 June patient text",
     excerpt:
-      "I tried to keep working but standing made it worse, so I left my shift early for the second time this month.",
+      "Pain was 6/10 this afternoon. I tried to keep working but standing made it worse, so I left my shift early for the second time this month.",
     field: "functionalImpacts",
     recordedAt: "2026-06-30T17:48:00+01:00",
     language: "English",

@@ -1,11 +1,11 @@
-import { ClinicianDashboard } from "@/components/clinician/clinician-dashboard";
+import { ClinicianTodayPage } from "@/components/clinician/clinician-today-page";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Appointment summary | Thread",
-  description: "Amina Khan’s concise, evidence-backed appointment summary.",
+  title: "Today’s appointments | Thread",
+  description: "Dr Rahman’s appointment working list for today.",
 };
 
 export default function ClinicianPage() {
-  return <ClinicianDashboard mode="summary" />;
+  return <ClinicianTodayPage />;
 }

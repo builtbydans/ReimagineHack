@@ -129,10 +129,7 @@ export const appointmentBriefStatusInputSchema = z.object({
 
 export const transcribeMetadataSchema = z.object({
   preferredLanguage: z.string().trim().min(2).max(80).optional(),
-  mimeType: z
-    .string()
-    .trim()
-    .regex(/^audio\/[a-zA-Z0-9.+-]+$/, "An audio MIME type is required."),
+  mimeType: z.string().trim().min(1).max(200),
   byteLength: z
     .number()
     .int()

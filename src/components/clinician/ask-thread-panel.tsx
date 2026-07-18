@@ -4,27 +4,63 @@ import * as React from "react";
 import { format } from "date-fns";
 import {
   AlertCircle,
-  Bot,
+  Check,
   CheckCircle2,
   ChevronDown,
   CircleHelp,
   FileSearch,
+  Link2,
   LoaderCircle,
   Send,
-  ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EVIDENCE_IDS } from "@/data/seed";
 import { cn } from "@/lib/utils";
 import type { ContextAnswer, EvidenceReference } from "@/server/types/domain";
 
-const quickSnapshotQuestion = "Give me a quick summary of Amina’s recorded health story.";
-
 const suggestedQuestions = [
-  "When does Amina most often report severe pain?",
-  "What has she said about naproxen and nausea?",
-  "How have her symptoms affected work and sleep?",
+  "When is the pain worst?",
+  "Has naproxen helped?",
+  "How is this affecting daily life?",
+  "What happened at A&E?",
+] as const;
+
+const changesSinceLastGp = [
+  {
+    text: "Pain increased from 6/10 to 8/10",
+    evidenceIds: [EVIDENCE_IDS.secondEarlyDeparture, EVIDENCE_IDS.julyPainAndSleep],
+  },
+  {
+    text: "Pain now regularly interrupts sleep",
+    evidenceIds: [EVIDENCE_IDS.juneSleep, EVIDENCE_IDS.julyPainAndSleep],
+  },
+  {
+    text: "Left work early twice",
+    evidenceIds: [EVIDENCE_IDS.voiceWork, EVIDENCE_IDS.secondEarlyDeparture],
+  },
+  {
+    text: "Reported nausea after naproxen",
+    evidenceIds: [EVIDENCE_IDS.medicationNausea, EVIDENCE_IDS.avoidedMedication],
+  },
+  {
+    text: "Attended A&E after a severe pain episode",
+    evidenceIds: [EVIDENCE_IDS.emergencyReason, EVIDENCE_IDS.emergencyPain],
+  },
+] as const;
+
+const discussionPoints = [
+  "Why the pain has been increasing",
+  "Whether another option may cause less nausea",
+  "What happens next in her care",
+] as const;
+
+const priorities = [
+  "Better pain control",
+  "Less nausea",
+  "Confidence remaining at work",
 ] as const;
 
 type ContextQuestionResponse = {
@@ -38,13 +74,51 @@ type ContextQuestionEnvelope = {
   error?: { message?: string };
 };
 
-type AnswerKind = "snapshot" | "question";
+type Exchange = {
+  id: number;
+  question: string;
+  result?: ContextQuestionResponse;
+  error?: string;
+};
 
 const confidenceDetails = {
-  supported: { label: "Supported", icon: CheckCircle2, className: "border-sage-200 bg-sage-50 text-sage-700" },
-  partial: { label: "Partially supported", icon: CircleHelp, className: "border-amber-200 bg-amber-50 text-amber-800" },
-  insufficient: { label: "Insufficient information", icon: AlertCircle, className: "border-border bg-white text-muted-foreground" },
+  supported: {
+    label: "Supported",
+    icon: CheckCircle2,
+    className: "border-sage-200 bg-sage-50 text-sage-700",
+  },
+  partial: {
+    label: "Partially supported",
+    icon: CircleHelp,
+    className: "border-amber-200 bg-amber-50 text-amber-800",
+  },
+  insufficient: {
+    label: "Insufficient information",
+    icon: AlertCircle,
+    className: "border-border bg-white text-muted-foreground",
+  },
 } as const;
+
+function EvidenceLink({
+  label,
+  evidenceIds,
+  openEvidence,
+}: {
+  label: string;
+  evidenceIds: readonly string[];
+  openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => openEvidence(label, evidenceIds)}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[10px] font-semibold text-plum-700 transition-colors hover:bg-plum-50"
+      aria-label={`View evidence for: ${label}`}
+    >
+      <Link2 className="size-3" /> Evidence
+    </button>
+  );
+}
 
 function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
   const [expandedId, setExpandedId] = React.useState<string | null>(null);
@@ -54,16 +128,20 @@ function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
   const visibleEvidence = showAll ? evidence : evidence.slice(0, 3);
 
   return (
-    <section className="mt-4 border-t pt-4" aria-labelledby="supporting-sources-heading">
+    <section className="mt-4" aria-label="Supporting sources">
       <div className="flex items-center justify-between gap-3">
-        <h3 id="supporting-sources-heading" className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Supporting sources</h3>
-        <span className="text-[10px] text-muted-foreground">{evidence.length} {evidence.length === 1 ? "record" : "records"}</span>
+        <h4 className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">
+          Supporting sources
+        </h4>
+        <span className="text-[10px] text-muted-foreground">
+          {evidence.length} {evidence.length === 1 ? "record" : "records"}
+        </span>
       </div>
-      <div className="mt-2 space-y-2">
+      <div className="mt-2 space-y-1.5">
         {visibleEvidence.map((source) => {
           const expanded = expandedId === source.id;
           return (
-            <article key={source.id} className="overflow-hidden rounded-xl border bg-white">
+            <article key={source.id} className="overflow-hidden rounded-xl bg-white ring-1 ring-border">
               <button
                 type="button"
                 aria-expanded={expanded}
@@ -75,10 +153,17 @@ function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
                   <span className="block truncate text-xs font-semibold">{source.label}</span>
                   <span className="mt-1 flex flex-wrap items-center gap-1.5">
                     <SourceBadge sourceKind={source.sourceKind} compact />
-                    <span className="text-[9px] text-muted-foreground">{format(new Date(source.recordedAt), "d MMM yyyy")}</span>
+                    <span className="text-[9px] text-muted-foreground">
+                      {format(new Date(source.recordedAt), "d MMM yyyy")}
+                    </span>
                   </span>
                 </span>
-                <ChevronDown className={cn("size-3.5 shrink-0 text-muted-foreground transition-transform", expanded && "rotate-180")} />
+                <ChevronDown
+                  className={cn(
+                    "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                    expanded && "rotate-180",
+                  )}
+                />
               </button>
               {expanded ? (
                 <div className="border-t bg-[#fbfaf8] px-3 py-3">
@@ -91,7 +176,11 @@ function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
                       <p className="mt-1">{source.translatedExcerpt}</p>
                     </div>
                   ) : null}
-                  {source.organisation ? <p className="mt-3 text-[10px] text-muted-foreground">Source: {source.organisation}</p> : null}
+                  {source.organisation ? (
+                    <p className="mt-3 text-[10px] text-muted-foreground">
+                      Source: {source.organisation}
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </article>
@@ -99,7 +188,11 @@ function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
         })}
       </div>
       {evidence.length > 3 ? (
-        <button type="button" onClick={() => setShowAll((current) => !current)} className="mt-2 w-full py-1 text-center text-[11px] font-semibold text-plum-700 hover:underline">
+        <button
+          type="button"
+          onClick={() => setShowAll((current) => !current)}
+          className="mt-2 text-[11px] font-semibold text-plum-700 hover:underline"
+        >
           {showAll ? "Show fewer sources" : `Show ${evidence.length - 3} more sources`}
         </button>
       ) : null}
@@ -107,32 +200,133 @@ function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
   );
 }
 
-export function AskThreadPanel({ patientId }: { patientId: string }) {
-  const [question, setQuestion] = React.useState("");
-  const [submittedQuestion, setSubmittedQuestion] = React.useState("");
-  const [answerKind, setAnswerKind] = React.useState<AnswerKind>("snapshot");
-  const [result, setResult] = React.useState<ContextQuestionResponse | null>(null);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const requestId = React.useRef(0);
-  const loadingRef = React.useRef(false);
-  const initialRequestMade = React.useRef(false);
-  const lastRequest = React.useRef<{ question: string; kind: AnswerKind }>({ question: quickSnapshotQuestion, kind: "snapshot" });
+function PreparedBriefing({
+  openEvidence,
+}: {
+  openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
+}) {
+  return (
+    <article className="rounded-[1.35rem] bg-white px-5 py-6 shadow-card sm:px-7 sm:py-7" aria-labelledby="prepared-briefing-heading">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[.13em] text-plum-600">
+            Prepared briefing
+          </p>
+          <h2 id="prepared-briefing-heading" className="mt-2 text-xl font-semibold tracking-[-.035em] sm:text-2xl">
+            Here’s what to know before seeing Amina
+          </h2>
+        </div>
+        <Badge variant="ai" className="bg-amber-50/70">AI-organised</Badge>
+      </div>
 
-  const askQuestion = React.useCallback(async (nextQuestion: string, kind: AnswerKind = "question") => {
+      <div className="mt-5 max-w-3xl space-y-3 text-sm leading-6 text-foreground/90">
+        <p>
+          Amina is 32 and has a recorded diagnosis of endometriosis. Since her last GP appointment on 4 June, she has reported worsening pelvic and lower-back pain, increasing from 6/10 to 8/10. Pain is now interrupting her sleep and has caused her to leave work early twice.
+        </p>
+        <p>
+          She attended UCLH A&amp;E on 17 May following a severe pain episode. Observations were stable, displayed blood results were within range, and she was discharged with GP follow-up advice.
+        </p>
+        <p>
+          Naproxen provides some relief but has caused nausea, and she later avoided a dose. Her gynaecology review is booked for 24 July.
+        </p>
+      </div>
+
+      <div className="mt-7 grid gap-7 border-t pt-6 lg:grid-cols-[1.35fr_.9fr]">
+        <section aria-labelledby="since-last-gp-heading">
+          <h3 id="since-last-gp-heading" className="text-sm font-semibold">
+            Since the last GP encounter
+          </h3>
+          <ul className="mt-3 space-y-1">
+            {changesSinceLastGp.map((change) => (
+              <li key={change.text} className="flex min-h-9 items-center gap-2 text-sm leading-5">
+                <Check className="size-3.5 shrink-0 text-sage-700" />
+                <span className="flex-1">{change.text}</span>
+                <EvidenceLink label={change.text} evidenceIds={change.evidenceIds} openEvidence={openEvidence} />
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-1">
+          <section aria-labelledby="discuss-heading">
+            <h3 id="discuss-heading" className="text-sm font-semibold">Amina wants to discuss</h3>
+            <ul className="mt-3 space-y-2 text-sm leading-5">
+              {discussionPoints.map((item) => (
+                <li key={item} className="flex gap-2">
+                  <span className="mt-2 size-1 shrink-0 rounded-full bg-plum-400" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section aria-labelledby="priorities-heading">
+            <h3 id="priorities-heading" className="text-sm font-semibold">Patient priorities</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {priorities.map((priority) => (
+                <span key={priority} className="rounded-full bg-sage-50 px-3 py-1.5 text-xs font-medium text-sage-800">
+                  {priority}
+                </span>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function AnswerBlock({ exchange }: { exchange: Exchange }) {
+  if (!exchange.result) return null;
+  const answerDetails = confidenceDetails[exchange.result.answer.confidence];
+  const ConfidenceIcon = answerDetails.icon;
+
+  return (
+    <div className="mt-3 rounded-2xl bg-[#f8f6f3] p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[.11em] text-plum-600">Thread answer</p>
+        <Badge variant="outline" className={cn("px-2 py-1 text-[9px]", answerDetails.className)}>
+          <ConfidenceIcon /> {answerDetails.label}
+        </Badge>
+      </div>
+      <p className="mt-3 text-sm font-medium leading-6 text-plum-950">
+        {exchange.result.answer.answer}
+      </p>
+      {exchange.result.answer.missingInformation ? (
+        <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          <span className="font-semibold text-foreground">What isn’t recorded: </span>
+          {exchange.result.answer.missingInformation}
+        </p>
+      ) : null}
+      <SupportingSources evidence={exchange.result.evidence} />
+    </div>
+  );
+}
+
+export function AskThreadPanel({
+  patientId,
+  openEvidence,
+}: {
+  patientId: string;
+  openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
+}) {
+  const [question, setQuestion] = React.useState("");
+  const [exchanges, setExchanges] = React.useState<Exchange[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const sequence = React.useRef(0);
+  const loadingRef = React.useRef(false);
+
+  const askQuestion = React.useCallback(async (nextQuestion: string, retryId?: number) => {
     const trimmed = nextQuestion.trim();
     if (trimmed.length < 3 || loadingRef.current) return;
 
-    const currentRequest = requestId.current + 1;
-    requestId.current = currentRequest;
+    const id = retryId ?? sequence.current + 1;
+    sequence.current = Math.max(sequence.current + 1, id);
     loadingRef.current = true;
-    lastRequest.current = { question: trimmed, kind };
-    if (kind === "question") setQuestion(trimmed);
-    setSubmittedQuestion(trimmed);
-    setAnswerKind(kind);
-    setResult(null);
-    setError(null);
     setLoading(true);
+    setQuestion("");
+    setExchanges((current) => retryId
+      ? current.map((item) => item.id === retryId ? { id, question: trimmed } : item)
+      : [...current, { id, question: trimmed }]);
 
     try {
       const response = await fetch("/api/context-questions", {
@@ -140,132 +334,107 @@ export function AskThreadPanel({ patientId }: { patientId: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ patientId, question: trimmed }),
       });
-      const body = await response.json() as ContextQuestionEnvelope;
+      const body = (await response.json()) as ContextQuestionEnvelope;
       if (!response.ok || !body.ok || !body.data) {
         throw new Error(body.error?.message ?? "Thread could not answer that question.");
       }
-      if (requestId.current === currentRequest) setResult(body.data);
+      setExchanges((current) => current.map((item) => item.id === id ? { ...item, result: body.data } : item));
     } catch (requestError) {
-      if (requestId.current === currentRequest) {
-        setError(requestError instanceof Error ? requestError.message : "Thread could not answer that question.");
-      }
+      const message = requestError instanceof Error ? requestError.message : "Thread could not answer that question.";
+      setExchanges((current) => current.map((item) => item.id === id ? { ...item, error: message } : item));
     } finally {
-      if (requestId.current === currentRequest) {
-        loadingRef.current = false;
-        setLoading(false);
-      }
+      loadingRef.current = false;
+      setLoading(false);
     }
   }, [patientId]);
 
-  React.useEffect(() => {
-    if (initialRequestMade.current) return;
-    initialRequestMade.current = true;
-    void askQuestion(quickSnapshotQuestion, "snapshot");
-  }, [askQuestion]);
-
-  const answerDetails = result ? confidenceDetails[result.answer.confidence] : null;
-  const ConfidenceIcon = answerDetails?.icon;
-
   return (
-    <aside className="h-fit overflow-hidden rounded-[1.25rem] border bg-white shadow-card xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto" aria-labelledby="ask-thread-heading">
-      <header className="border-b bg-plum-50/55 px-5 py-5">
-        <div className="flex items-start gap-3">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-plum-700 shadow-sm"><Bot className="size-4" /></span>
-          <div>
-            <h2 id="ask-thread-heading" className="text-base font-semibold tracking-[-.025em]">Ask Thread</h2>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Ask focused questions about Amina’s recorded health story.</p>
-          </div>
+    <section className="min-w-0" aria-labelledby="ask-thread-heading">
+      <header className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 id="ask-thread-heading" className="text-3xl font-semibold tracking-[-.045em]">Ask Thread</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-5 text-muted-foreground">
+            Explore Amina’s recorded health story. Answers are limited to recorded patient and clinical evidence.
+          </p>
         </div>
+        <Badge variant="clinical" className="w-fit py-1.5">
+          <ShieldCheck /> Evidence-bounded
+        </Badge>
       </header>
 
-      <div className="space-y-5 px-4 py-4">
-        <div aria-live="polite">
-          {loading ? (
-            <div className="flex items-center gap-3 rounded-xl bg-plum-50 px-4 py-4 text-xs text-plum-800"><LoaderCircle className="size-4 animate-spin" />{answerKind === "snapshot" ? "Preparing a quick snapshot…" : "Searching Amina’s recorded history…"}</div>
-          ) : null}
+      <PreparedBriefing openEvidence={openEvidence} />
 
-          {error ? (
-            <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-              <div className="flex gap-3 text-xs leading-5 text-amber-900"><AlertCircle className="mt-0.5 size-4 shrink-0" /><span>{error}</span></div>
-              <Button variant="ghost" size="sm" className="mt-2 text-amber-900" onClick={() => void askQuestion(lastRequest.current.question, lastRequest.current.kind)}>Try again</Button>
-            </div>
-          ) : null}
-
-          {result && answerDetails ? (
-            <article className="rounded-xl border bg-[#fbfaf8] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[.11em] text-plum-600">{answerKind === "snapshot" ? "Quick snapshot" : "Direct answer"}</p>
-                  {answerKind === "question" ? <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{submittedQuestion}</p> : null}
-                </div>
-                <Badge variant="outline" className={cn("px-2 py-1 text-[9px]", answerDetails.className)}>
-                  {ConfidenceIcon ? <ConfidenceIcon /> : null}{answerDetails.label}
-                </Badge>
-              </div>
-
-              <p className="mt-3 text-sm font-medium leading-6 text-plum-950">{result.answer.answer}</p>
-
-              {result.answer.safetyClassification === "clinical_decision_request" ? (
-                <div className="mt-4 flex gap-2 rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900"><ShieldAlert className="mt-0.5 size-4 shrink-0" />Ask Thread is limited to retrieving recorded context.</div>
-              ) : null}
-
-              {result.answer.missingInformation ? (
-                <section className="mt-4 rounded-xl bg-muted/70 p-3" aria-labelledby="missing-information-heading">
-                  <h3 id="missing-information-heading" className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Missing information</h3>
-                  <p className="mt-1.5 text-xs leading-5">{result.answer.missingInformation}</p>
-                </section>
-              ) : null}
-
-              <SupportingSources key={result.answer.evidenceIds.join("-")} evidence={result.evidence} />
-            </article>
-          ) : null}
-        </div>
-
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void askQuestion(question);
-          }}
-          className="rounded-xl border bg-white p-2 shadow-card"
-        >
-          <label htmlFor="ask-thread-question" className="sr-only">Ask a question about Amina’s recorded history</label>
-          <div className="flex items-center gap-2">
-            <input
-              id="ask-thread-question"
-              value={question}
+      <section className="mt-7" aria-labelledby="suggested-questions-heading">
+        <h2 id="suggested-questions-heading" className="text-sm font-semibold">Suggested questions</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {suggestedQuestions.map((suggestion) => (
+            <button
+              key={suggestion}
+              type="button"
               disabled={loading}
-              onChange={(event) => setQuestion(event.target.value)}
-              placeholder="Ask a question about Amina’s recorded history…"
-              maxLength={500}
-              className="h-9 min-w-0 flex-1 bg-transparent px-2 text-xs outline-none placeholder:text-muted-foreground disabled:opacity-60"
-            />
-            <Button type="submit" size="icon" className="size-8" disabled={loading || question.trim().length < 3} aria-label="Ask Thread">
-              {loading ? <LoaderCircle className="animate-spin" /> : <Send />}
-            </Button>
-          </div>
-        </form>
+              onClick={() => void askQuestion(suggestion)}
+              className="rounded-full border bg-white px-4 py-2.5 text-left text-xs font-semibold transition-colors hover:border-plum-300 hover:bg-plum-50 disabled:opacity-50"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+      </section>
 
-        <section aria-labelledby="suggested-questions-heading">
-          <h3 id="suggested-questions-heading" className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Suggested questions</h3>
-          <div className="mt-2 space-y-1.5">
-            {suggestedQuestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                disabled={loading}
-                onClick={() => void askQuestion(suggestion)}
-                className="group flex w-full items-center gap-2.5 rounded-xl border bg-white px-3 py-2.5 text-left text-xs font-medium leading-4 transition-colors hover:border-plum-200 hover:bg-plum-50 disabled:opacity-50"
-              >
-                <CircleHelp className="size-3.5 shrink-0 text-plum-500" />
-                <span className="flex-1">{suggestion}</span>
-                <ChevronDown className="size-3 -rotate-90 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              </button>
-            ))}
-          </div>
+      {exchanges.length ? (
+        <section className="mt-7 rounded-[1.35rem] bg-white px-5 shadow-card sm:px-7" aria-label="Ask Thread conversation" aria-live="polite">
+          {exchanges.map((exchange) => {
+            const pending = loading && exchange.id === exchanges.at(-1)?.id && !exchange.result && !exchange.error;
+            return (
+              <article key={exchange.id} className="border-b py-6 last:border-0">
+                <div className="flex gap-3">
+                  <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-[.11em] text-muted-foreground">You</span>
+                  <h3 className="text-sm font-semibold">{exchange.question}</h3>
+                </div>
+                {pending ? (
+                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-plum-50 px-4 py-3 text-xs text-plum-800">
+                    <LoaderCircle className="size-4 animate-spin" /> Searching Amina’s recorded history…
+                  </div>
+                ) : null}
+                {exchange.error ? (
+                  <div role="alert" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="flex gap-2 text-xs leading-5 text-amber-900"><AlertCircle className="mt-0.5 size-4 shrink-0" />{exchange.error}</p>
+                    <Button variant="ghost" size="sm" className="mt-2 text-amber-900" onClick={() => void askQuestion(exchange.question, exchange.id)}>Try again</Button>
+                  </div>
+                ) : null}
+                <AnswerBlock exchange={exchange} />
+              </article>
+            );
+          })}
         </section>
+      ) : null}
 
-        <p className="border-t pt-4 text-[10px] leading-4 text-muted-foreground">Thread uses Amina’s recorded updates and imported encounters. It does not provide diagnosis or treatment advice.</p>
-      </div>
-    </aside>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          void askQuestion(question);
+        }}
+        className="mt-6 rounded-2xl border bg-white p-2 shadow-card"
+      >
+        <label htmlFor="ask-thread-question" className="sr-only">Ask about Amina’s recorded health story</label>
+        <div className="flex items-center gap-2">
+          <input
+            id="ask-thread-question"
+            value={question}
+            disabled={loading}
+            onChange={(event) => setQuestion(event.target.value)}
+            placeholder="Ask about Amina’s recorded health story…"
+            maxLength={500}
+            className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-60"
+          />
+          <Button type="submit" size="icon" className="size-9" disabled={loading || question.trim().length < 3} aria-label="Ask Thread">
+            {loading ? <LoaderCircle className="animate-spin" /> : <Send />}
+          </Button>
+        </div>
+      </form>
+      <p className="mt-3 text-[10px] leading-4 text-muted-foreground">
+        Thread retrieves recorded context; it does not provide diagnosis or treatment advice.
+      </p>
+    </section>
   );
 }

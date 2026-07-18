@@ -26,10 +26,10 @@ export const AVAILABLE_APPOINTMENT_PRIORITIES = [
 export const FALLBACK_TRANSCRIPT =
   "The pain woke me during the night. It was about eight out of ten in my pelvis and lower back. I did not take the pain medication because I was worried the nausea would happen again, and I am concerned about getting through work.";
 
-export const FALLBACK_ROMAN_URDU_TRANSCRIPT =
-  "Kal raat mere pait ke neeche bohat tez dard tha, takreeban saat das mein se. Dard kamar tak ja raha tha. Main kaam par zyada dair khari nahi reh saki aur jaldi ghar aana para.";
+export const FALLBACK_URDU_TRANSCRIPT =
+  "کل رات میرے پیٹ کے نچلے حصے میں بہت تیز درد تھا، تقریباً دس میں سے سات۔ درد کمر تک جا رہا تھا۔ میں کام پر زیادہ دیر کھڑی نہیں رہ سکی اور مجھے جلدی گھر آنا پڑا۔";
 
-export const FALLBACK_ROMAN_URDU_TRANSLATION =
+export const FALLBACK_URDU_TRANSLATION =
   "Last night I had strong pain in my lower abdomen, around seven out of ten. The pain spread to my lower back. I could not stand for long at work and had to leave early.";
 
 export const SAFETY_NOTICE =

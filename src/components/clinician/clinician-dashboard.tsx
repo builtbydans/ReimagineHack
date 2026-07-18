@@ -4,13 +4,10 @@ import * as React from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import {
-  ArrowLeftRight,
-  ArrowRight,
   CalendarClock,
   Check,
   CheckCircle2,
   ChevronRight,
-  ClipboardList,
   Clock3,
   DatabaseZap,
   Eye,
@@ -18,9 +15,7 @@ import {
   FlaskConical,
   History,
   Languages,
-  Link2,
   LoaderCircle,
-  MessageSquareQuote,
   Pill,
   RefreshCw,
   Search,
@@ -37,23 +32,22 @@ import {
   seedTimelineEvents,
 } from "@/data/seed";
 import { useDemoData } from "@/components/shared/demo-data-provider";
-import { ThreadLogo } from "@/components/shared/thread-logo";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { EvidenceDrawer } from "@/components/evidence/evidence-drawer";
 import { AskThreadPanel } from "@/components/clinician/ask-thread-panel";
+import {
+  ClinicianHeader,
+  type ClinicianMode,
+} from "@/components/clinician/clinician-header";
 import { EncounterDetailsSheet } from "@/components/timeline/encounter-details-sheet";
 import { TimelineList } from "@/components/timeline/timeline-list";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { EvidenceReference, TimelineEvent } from "@/server/types/domain";
-
-export type ClinicianMode = "summary" | "investigation";
 
 type EvidenceState = {
   observation: string;
@@ -79,97 +73,9 @@ const importSteps = [
 
 const seededUclhEncounter = seedTimelineEvents.find((event) => event.type === "ae_encounter") ?? null;
 
-const summaryChanges = [
-  {
-    text: "Pain increased from 6/10 to 8/10",
-    evidenceIds: [EVIDENCE_IDS.secondEarlyDeparture, EVIDENCE_IDS.julyPainAndSleep],
-  },
-  {
-    text: "Pain is now regularly interrupting sleep",
-    evidenceIds: [EVIDENCE_IDS.juneSleep, EVIDENCE_IDS.julyPainAndSleep],
-  },
-  {
-    text: "Amina has left work early twice this month",
-    evidenceIds: [EVIDENCE_IDS.voiceWork, EVIDENCE_IDS.secondEarlyDeparture],
-  },
-  {
-    text: "She attended A&E following a severe pain episode",
-    evidenceIds: [EVIDENCE_IDS.emergencyReason, EVIDENCE_IDS.emergencyPain],
-  },
-  {
-    text: "Naproxen provides partial relief but causes nausea",
-    evidenceIds: [EVIDENCE_IDS.aprilMedicationRelief, EVIDENCE_IDS.gpNaproxen, EVIDENCE_IDS.medicationNausea, EVIDENCE_IDS.avoidedMedication],
-  },
-  {
-    text: "Gynaecology referral remains pending",
-    evidenceIds: [EVIDENCE_IDS.gpReferral, EVIDENCE_IDS.gpTracking],
-  },
-] as const;
-
-const currentPicture = [
-  ["Pain", "8/10 most recently reported; pelvis and lower back; interrupts sleep"],
-  ["Medication", "Naproxen gives partial relief; nausea reported; a later dose was avoided"],
-  ["Daily impact", "Left work early twice this month and has been woken overnight"],
-  ["Patient priority", "Better pain control, less nausea and confidence staying at work"],
-] as const;
-
-const patientQuestions = [
-  "Why has the pain been increasing?",
-  "Is there something else that does not make me feel sick?",
-  "What are the next steps in my care?",
-] as const;
-
 function getEvidence(evidenceIds: readonly string[]) {
   const ids = new Set(evidenceIds);
   return seedEvidenceReferences.filter((reference) => ids.has(reference.id));
-}
-
-function ModeNavigation({ mode }: { mode: ClinicianMode }) {
-  const tabs = [
-    { label: "Appointment Summary", href: "/clinician", value: "summary" },
-    { label: "Clinical Investigation", href: "/clinician/investigation", value: "investigation" },
-  ] as const;
-
-  return (
-    <nav aria-label="Clinician view" className="order-3 flex w-full gap-1 self-stretch sm:order-none sm:ml-5 sm:w-auto">
-      {tabs.map((tab) => {
-        const active = tab.value === mode;
-        return (
-          <Link
-            key={tab.value}
-            href={tab.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "relative flex h-11 flex-1 items-center justify-center px-3 text-xs font-semibold text-muted-foreground transition-colors sm:h-full sm:flex-none sm:px-4",
-              active && "text-plum-800",
-              !active && "hover:text-foreground",
-            )}
-          >
-            {tab.label}
-            {active ? <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-plum-700" /> : null}
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
-function ClinicianHeader({ mode }: { mode: ClinicianMode }) {
-  return (
-    <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur-xl">
-      <div className="mx-auto flex min-h-16 max-w-[1320px] flex-wrap items-center gap-x-4 px-4 sm:flex-nowrap sm:px-6 lg:px-8">
-        <ThreadLogo href="/clinician" />
-        <Separator orientation="vertical" className="hidden h-6 sm:block" />
-        <ModeNavigation mode={mode} />
-        <div className="ml-auto flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="hidden md:inline-flex">
-            <Link href="/patient"><ArrowLeftRight /> Patient view</Link>
-          </Button>
-          <Avatar className="size-8"><AvatarFallback className="bg-sage-100 text-xs text-sage-700">DR</AvatarFallback></Avatar>
-        </div>
-      </div>
-    </header>
-  );
 }
 
 function PatientHeader({ events }: { events: TimelineEvent[] }) {
@@ -202,120 +108,99 @@ function PatientHeader({ events }: { events: TimelineEvent[] }) {
   );
 }
 
-function SummarySectionHeading({ children, detail }: { children: React.ReactNode; detail?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <h2 className="text-sm font-semibold tracking-[-.01em] text-plum-950">{children}</h2>
-      {detail}
-    </div>
-  );
-}
-
-function EvidenceAction({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title="View evidence"
-      aria-label={`View evidence for: ${label}`}
-      className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-plum-50 hover:text-plum-700"
-    >
-      <Link2 className="size-3.5" />
-    </button>
-  );
-}
-
-function AppointmentSummary({ events, openEvidence, openEncounter }: {
-  events: TimelineEvent[];
+function PatientContextPanel({ openEvidence, openEncounter }: {
   openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
   openEncounter: () => void;
 }) {
   const allSummaryEvidence = seedAppointmentBrief.evidenceIds;
 
   return (
-    <main className="mx-auto max-w-[1500px] px-4 py-4 sm:px-6 lg:px-8">
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_23rem]">
-      <article className="rounded-[1.25rem] border bg-white px-5 py-4 shadow-card sm:px-6">
-        <PatientHeader events={events} />
-
-        <section className="my-4 flex gap-3 rounded-xl bg-sage-50 px-4 py-3" aria-labelledby="review-reason">
-          <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-sage-700 shadow-sm"><ClipboardList className="size-3.5" /></span>
+    <aside className="rounded-[1.35rem] bg-white px-5 py-6 shadow-card xl:sticky xl:top-20" aria-labelledby="patient-context-heading">
+      <section className="border-b pb-5">
+        <div className="flex items-center gap-3">
+          <Avatar className="size-11 ring-4 ring-plum-50">
+            <AvatarFallback className="bg-plum-100 text-sm font-semibold text-plum-700">AK</AvatarFallback>
+          </Avatar>
           <div>
-            <h2 id="review-reason" className="text-[10px] font-semibold uppercase tracking-[.12em] text-sage-700">Reason for review</h2>
-            <p className="mt-0.5 text-sm font-medium leading-5 text-sage-900">Amina is seeking review for worsening pelvic pain, increasing disruption to sleep and work, and nausea associated with naproxen.</p>
+            <h2 id="patient-context-heading" className="text-lg font-semibold tracking-[-.025em]">Amina Khan</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Age 32 · Endometriosis</p>
           </div>
-        </section>
-
-        <div className="grid gap-6 lg:grid-cols-[1.08fr_.92fr] lg:gap-8">
-          <section aria-labelledby="changes-heading">
-            <SummarySectionHeading detail={<Badge variant="ai">AI-organised</Badge>}>
-              <span id="changes-heading">What has changed since your last encounter?</span>
-            </SummarySectionHeading>
-            <ul className="mt-2 divide-y" aria-label="Changes since last GP encounter">
-              {summaryChanges.map((change) => (
-                <li key={change.text} className="flex min-h-10 items-center gap-3 py-1.5 text-sm leading-5">
-                  <CheckCircle2 className="size-4 shrink-0 text-sage-600" />
-                  <span className="flex-1">{change.text}</span>
-                  <EvidenceAction label={change.text} onClick={() => openEvidence(change.text, change.evidenceIds)} />
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="border-t pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" aria-labelledby="clinical-context-heading">
-            <SummarySectionHeading detail={<button type="button" onClick={openEncounter} className="text-xs font-semibold text-plum-700 hover:underline">View record</button>}>
-              <span id="clinical-context-heading">Recent clinical context</span>
-            </SummarySectionHeading>
-            <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"><FileCheck2 className="size-3.5 text-sage-600" />UCLH A&E · 17 May 2026</div>
-            <dl className="mt-2 divide-y text-sm">
-              {[
-                ["Why she attended", "Severe lower-abdominal and pelvic pain, reported as 8/10"],
-                ["Observations", "Stable: HR 84, BP 124/78, temperature 36.8°C, SpO₂ 99%"],
-                ["Blood results", "Displayed results within range; pregnancy test negative"],
-                ["Outcome", "Analgesia administered; discharged home"],
-                ["Follow-up", "Advised to arrange GP follow-up; return advice provided"],
-              ].map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[7.2rem_1fr] gap-3 py-2">
-                  <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-                  <dd className="text-xs font-medium leading-5">{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
         </div>
-
-        <div className="mt-4 grid gap-6 border-t pt-4 lg:grid-cols-[1.08fr_.92fr] lg:gap-8">
-          <section aria-labelledby="current-picture-heading">
-            <SummarySectionHeading><span id="current-picture-heading">Current patient-reported picture</span></SummarySectionHeading>
-            <dl className="mt-2 divide-y">
-              {currentPicture.map(([label, value]) => (
-                <div key={label} className="grid grid-cols-[6.3rem_1fr] gap-3 py-1.5 text-xs leading-5">
-                  <dt className="font-semibold text-plum-800">{label}</dt>
-                  <dd>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </section>
-
-          <section className="border-t pt-5 lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0" aria-labelledby="questions-heading">
-            <SummarySectionHeading><span id="questions-heading">What Amina wants to discuss</span></SummarySectionHeading>
-            <ul className="mt-2 space-y-1.5">
-              {patientQuestions.map((question) => (
-                <li key={question} className="flex gap-2 text-sm leading-5"><MessageSquareQuote className="mt-0.5 size-3.5 shrink-0 text-plum-500" /><q>{question}</q></li>
-              ))}
-            </ul>
-          </section>
-        </div>
-
-        <footer className="mt-4 flex flex-col gap-3 border-t pt-3 sm:flex-row sm:items-center">
-          <p className="text-xs text-muted-foreground">Generated from 12 patient updates, 3 medication records and 2 healthcare encounters.</p>
-          <div className="flex gap-2 sm:ml-auto">
-            <Button variant="outline" size="sm" onClick={() => openEvidence("Appointment summary for Amina Khan", allSummaryEvidence)}><Eye /> View evidence</Button>
-            <Button asChild size="sm"><Link href="/clinician/investigation">Open clinical investigation <ArrowRight /></Link></Button>
+        <dl className="mt-5 grid grid-cols-2 gap-4">
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Preferred language</dt>
+            <dd className="mt-1 text-xs font-semibold">Urdu</dd>
           </div>
-        </footer>
-      </article>
-      <AskThreadPanel patientId={demoPatient.id} />
+          <div>
+            <dt className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Next appointment</dt>
+            <dd className="mt-1 text-xs font-semibold">Today, 12:30</dd>
+          </div>
+          <div className="col-span-2">
+            <dt className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Last GP encounter</dt>
+            <dd className="mt-1 text-xs font-semibold">4 June 2026</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="border-b py-5" aria-labelledby="key-context-heading">
+        <h3 id="key-context-heading" className="text-xs font-semibold uppercase tracking-[.11em] text-muted-foreground">Key context</h3>
+        <dl className="mt-2 divide-y">
+          {[
+            ["Current pain", "8/10 · pelvis and lower back"],
+            ["Sleep", "Regularly interrupted"],
+            ["Medication", "Naproxen · partial relief · nausea reported"],
+            ["Work impact", "Left early twice this month"],
+          ].map(([label, value]) => (
+            <div key={label} className="py-3 first:pt-2 last:pb-0">
+              <dt className="text-[10px] font-medium text-muted-foreground">{label}</dt>
+              <dd className="mt-1 text-xs font-semibold leading-5">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <section className="border-b py-5" aria-labelledby="recent-care-heading">
+        <div className="flex items-center justify-between gap-3">
+          <h3 id="recent-care-heading" className="text-xs font-semibold uppercase tracking-[.11em] text-muted-foreground">Recent care</h3>
+          <button type="button" onClick={openEncounter} className="text-[10px] font-semibold text-plum-700 hover:underline">View record</button>
+        </div>
+        <ol className="mt-3 space-y-4">
+          <li>
+            <p className="text-xs font-semibold">17 May · UCLH A&amp;E</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Severe pelvic pain · discharged with GP follow-up advice</p>
+          </li>
+          <li>
+            <p className="text-xs font-semibold">24 July · Gynaecology</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">Appointment booked at UCLH</p>
+          </li>
+        </ol>
+      </section>
+
+      <section className="pt-5" aria-labelledby="evidence-overview-heading">
+        <p className="text-[10px] font-semibold uppercase tracking-[.11em] text-muted-foreground">Evidence overview</p>
+        <h3 id="evidence-overview-heading" className="mt-1 text-sm font-semibold">17 supporting records</h3>
+        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">12 patient updates · 3 medication records · 2 clinical encounters</p>
+        <div className="mt-4 grid gap-2">
+          <Button variant="outline" size="sm" onClick={() => openEvidence("Pre-appointment briefing for Amina Khan", allSummaryEvidence)}><Eye /> View evidence</Button>
+          <Button asChild variant="ghost" size="sm"><Link href="/clinician/investigation">Open Clinical Investigation <ChevronRight /></Link></Button>
+        </div>
+      </section>
+    </aside>
+  );
+}
+
+function AppointmentSummary({ openEvidence, openEncounter }: {
+  openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
+  openEncounter: () => void;
+}) {
+  return (
+    <main className="mx-auto max-w-[1500px] px-4 py-6 sm:px-6 lg:px-8">
+      <Button asChild variant="ghost" size="sm" className="mb-4 -ml-3 text-muted-foreground">
+        <Link href="/clinician">← Back to today’s appointments</Link>
+      </Button>
+      <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:gap-7">
+        <AskThreadPanel patientId={demoPatient.id} openEvidence={openEvidence} />
+        <PatientContextPanel openEvidence={openEvidence} openEncounter={openEncounter} />
       </div>
     </main>
   );
@@ -359,7 +244,7 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
             <h2 className="mt-1 text-xl font-semibold tracking-[-.035em]">Clinical Investigation</h2>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Explore the source updates, imported records and evidence Thread used to organise Amina’s appointment summary.</p>
           </div>
-          <Button asChild variant="outline" size="sm" className="sm:ml-auto"><Link href="/clinician">Back to appointment summary</Link></Button>
+          <Button asChild variant="outline" size="sm" className="sm:ml-auto"><Link href="/clinician/appointment-summary">Back to appointment summary</Link></Button>
         </div>
       </div>
 
@@ -518,7 +403,7 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: ClinicianMode 
     <div className="min-h-dvh bg-[#f4f2ef] text-[#251c21]">
       <ClinicianHeader mode={mode} />
       {mode === "summary" ? (
-        <AppointmentSummary events={events} openEvidence={openEvidence} openEncounter={() => setEncounterEvent(encounterForDetails)} />
+        <AppointmentSummary openEvidence={openEvidence} openEncounter={() => setEncounterEvent(encounterForDetails)} />
       ) : (
         <ClinicalInvestigation
           events={events}
