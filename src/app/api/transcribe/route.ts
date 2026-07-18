@@ -1,5 +1,6 @@
 import { apiError, apiSuccess, handleRouteError } from "@/server/http/api-response";
 import { AMINA_PATIENT_ID } from "@/lib/constants";
+import { revalidatePath } from "next/cache";
 import { transcribeMetadataSchema } from "@/server/schemas";
 import {
   transcriptionPersistenceService,
@@ -86,13 +87,31 @@ export async function POST(request: Request) {
       throw error;
     }
 
+    if (persisted.timelineProjection === "completed") {
+      revalidatePath("/clinician", "layout");
+    }
+
     return apiSuccess(
       {
         transcription: {
           ...result,
           patientUpdateId: persisted.patientUpdate.id,
           evidenceId: persisted.evidence.id,
-          persisted: true,
+          ...(persisted.timelineEvent
+            ? { timelineEventId: persisted.timelineEvent.id }
+            : {}),
+          persisted: persisted.timelineProjection === "completed",
+          rawPersisted: true,
+          persistenceStatus:
+            persisted.timelineProjection === "completed"
+              ? "completed"
+              : "raw_saved_timeline_failed",
+          ...(persisted.timelineProjection === "failed"
+            ? {
+                notice:
+                  "Your recording was saved, but it could not yet be added to the clinician timeline.",
+              }
+            : {}),
         },
         safety:
           "Thread organised this transcript for review. It is patient-reported and not clinically verified.",

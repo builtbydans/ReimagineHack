@@ -15,6 +15,7 @@ import {
   type ClinicianAppointment,
 } from "@/data/clinician-appointments";
 import { cn } from "@/lib/utils";
+import type { ClinicianContext } from "@/server/types/domain";
 
 function StandardAppointmentRow({
   appointment,
@@ -92,8 +93,28 @@ function NextPatientRow({
   );
 }
 
-export function ClinicianTodayPage() {
-  const nextPatient = clinicianAppointments.find(
+export function ClinicianTodayPage({ context }: { context: ClinicianContext }) {
+  const lastGpEncounter = context.timelineEvents.find(
+    (event) => event.type === "gp_review",
+  );
+  const mainConcern = context.appointmentBrief.sections.find(
+    (section) => section.key === "main_concern",
+  )?.items[0]?.text;
+  const appointments = clinicianAppointments.map((appointment) =>
+    appointment.status === "Up next"
+      ? {
+          ...appointment,
+          patientName: context.patient.name,
+          age: context.patient.age,
+          condition: context.patient.condition,
+          lastEncounter: lastGpEncounter
+            ? format(new Date(lastGpEncounter.recordedAt), "d MMMM yyyy")
+            : "Not recorded",
+          context: mainConcern ?? appointment.context,
+        }
+      : appointment,
+  );
+  const nextPatient = appointments.find(
     (appointment) => appointment.status === "Up next",
   );
 
@@ -145,7 +166,7 @@ export function ClinicianTodayPage() {
             </span>
           </div>
           <ol className="divide-y overflow-hidden rounded-[1.35rem] border bg-white py-3 shadow-card">
-            {clinicianAppointments.map((appointment) =>
+            {appointments.map((appointment) =>
               appointment.status === "Up next" ? (
                 <NextPatientRow key={appointment.time} appointment={appointment} />
               ) : (
@@ -157,7 +178,7 @@ export function ClinicianTodayPage() {
 
         {nextPatient ? (
           <p className="mt-5 flex items-center gap-2 px-1 text-xs text-muted-foreground">
-            <Sparkles className="size-3.5 text-plum-600" /> Thread has prepared Amina’s recorded context before she enters.
+            <Sparkles className="size-3.5 text-plum-600" /> Thread has prepared {context.patient.name}’s recorded context before she enters.
           </p>
         ) : null}
       </main>

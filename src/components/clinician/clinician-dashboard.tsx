@@ -22,15 +22,6 @@ import {
   Stethoscope,
 } from "lucide-react";
 import { toast } from "sonner";
-import {
-  demoPatient,
-  EVIDENCE_IDS,
-  seedAppointmentBrief,
-  seedEvidenceReferences,
-  seedImportedEncounter,
-  seedThreadObservation,
-  seedTimelineEvents,
-} from "@/data/seed";
 import { useDemoData } from "@/components/shared/demo-data-provider";
 import { SourceBadge } from "@/components/shared/source-badge";
 import { EvidenceDrawer } from "@/components/evidence/evidence-drawer";
@@ -47,7 +38,15 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { EvidenceReference, TimelineEvent } from "@/server/types/domain";
+import type {
+  AppointmentBrief,
+  ClinicianContext,
+  EvidenceReference,
+  ImportedEncounter,
+  Patient,
+  ThreadObservation,
+  TimelineEvent,
+} from "@/server/types/domain";
 
 type EvidenceState = {
   observation: string;
@@ -71,16 +70,23 @@ const importSteps = [
   "Encounter imported",
 ];
 
-const seededUclhEncounter = seedTimelineEvents.find((event) => event.type === "ae_encounter") ?? null;
-
-function getEvidence(evidenceIds: readonly string[]) {
+function getEvidence(
+  evidence: EvidenceReference[],
+  evidenceIds: readonly string[],
+) {
   const ids = new Set(evidenceIds);
-  return seedEvidenceReferences.filter((reference) => ids.has(reference.id));
+  return evidence.filter((reference) => ids.has(reference.id));
 }
 
-function PatientHeader({ events }: { events: TimelineEvent[] }) {
+function PatientHeader({
+  events,
+  patient,
+}: {
+  events: TimelineEvent[];
+  patient: Patient;
+}) {
   const lastGpEncounter = events.find((event) => event.type === "gp_review");
-  const nextAppointment = demoPatient.nextAppointment;
+  const nextAppointment = patient.nextAppointment;
 
   return (
     <section className="flex flex-col gap-4 border-b pb-4 md:flex-row md:items-center" aria-labelledby="patient-name">
@@ -88,10 +94,10 @@ function PatientHeader({ events }: { events: TimelineEvent[] }) {
         <Avatar className="size-12 ring-4 ring-plum-50"><AvatarFallback className="bg-plum-100 text-sm font-semibold text-plum-700">AK</AvatarFallback></Avatar>
         <div className="min-w-0">
           <div className="flex flex-wrap items-baseline gap-x-2">
-            <h1 id="patient-name" className="text-2xl font-semibold tracking-[-.04em]">{demoPatient.name}</h1>
-            <span className="text-sm text-muted-foreground">Age {demoPatient.age}</span>
+            <h1 id="patient-name" className="text-2xl font-semibold tracking-[-.04em]">{patient.name}</h1>
+            <span className="text-sm text-muted-foreground">Age {patient.age}</span>
           </div>
-          <p className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-plum-800"><Stethoscope className="size-3.5" />{demoPatient.condition}</p>
+          <p className="mt-0.5 flex items-center gap-1.5 text-sm font-medium text-plum-800"><Stethoscope className="size-3.5" />{patient.condition}</p>
         </div>
       </div>
       <dl className="grid flex-1 grid-cols-2 gap-x-5 gap-y-3 md:ml-auto md:max-w-2xl md:border-l md:pl-6">
@@ -108,11 +114,46 @@ function PatientHeader({ events }: { events: TimelineEvent[] }) {
   );
 }
 
-function PatientContextPanel({ openEvidence, openEncounter }: {
+function PatientContextPanel({
+  openEvidence,
+  openEncounter,
+  patient,
+  events,
+  brief,
+  evidence,
+}: {
   openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
   openEncounter: () => void;
+  patient: Patient;
+  events: TimelineEvent[];
+  brief: AppointmentBrief;
+  evidence: EvidenceReference[];
 }) {
-  const allSummaryEvidence = seedAppointmentBrief.evidenceIds;
+  const allSummaryEvidence = brief.evidenceIds;
+  const lastGpEncounter = events.find((event) => event.type === "gp_review");
+  const recentCare = events
+    .filter((event) =>
+      ["ae_encounter", "gp_review", "referral", "specialist_review"].includes(
+        event.type,
+      ),
+    )
+    .slice(0, 2);
+  const keyContext = brief.sections
+    .filter((section) =>
+      ["main_concern", "changes_since_last_review", "medication"].includes(
+        section.key,
+      ),
+    )
+    .flatMap((section) =>
+      section.items.map((item) => ({ label: section.title, value: item.text })),
+    )
+    .slice(0, 4);
+  const patientUpdates = events.filter((event) =>
+    ["patient_text", "patient_voice"].includes(event.type),
+  ).length;
+  const clinicalEncounters = events.filter((event) =>
+    ["ae_encounter", "gp_review", "specialist_review"].includes(event.type),
+  ).length;
 
   return (
     <aside className="rounded-[1.35rem] bg-white px-5 py-6 shadow-card xl:sticky xl:top-20" aria-labelledby="patient-context-heading">
@@ -122,22 +163,22 @@ function PatientContextPanel({ openEvidence, openEncounter }: {
             <AvatarFallback className="bg-plum-100 text-sm font-semibold text-plum-700">AK</AvatarFallback>
           </Avatar>
           <div>
-            <h2 id="patient-context-heading" className="text-lg font-semibold tracking-[-.025em]">Amina Khan</h2>
-            <p className="mt-0.5 text-xs text-muted-foreground">Age 32 · Endometriosis</p>
+            <h2 id="patient-context-heading" className="text-lg font-semibold tracking-[-.025em]">{patient.name}</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Age {patient.age} · {patient.condition}</p>
           </div>
         </div>
         <dl className="mt-5 grid grid-cols-2 gap-4">
           <div>
             <dt className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Preferred language</dt>
-            <dd className="mt-1 text-xs font-semibold">Urdu</dd>
+            <dd className="mt-1 text-xs font-semibold">{patient.preferredLanguage}</dd>
           </div>
           <div>
             <dt className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Next appointment</dt>
-            <dd className="mt-1 text-xs font-semibold">Today, 12:30</dd>
+            <dd className="mt-1 text-xs font-semibold">{patient.nextAppointment ? format(new Date(patient.nextAppointment.date), "d MMM, HH:mm") : "Not scheduled"}</dd>
           </div>
           <div className="col-span-2">
             <dt className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">Last GP encounter</dt>
-            <dd className="mt-1 text-xs font-semibold">4 June 2026</dd>
+            <dd className="mt-1 text-xs font-semibold">{lastGpEncounter ? format(new Date(lastGpEncounter.recordedAt), "d MMMM yyyy") : "Not recorded"}</dd>
           </div>
         </dl>
       </section>
@@ -145,13 +186,8 @@ function PatientContextPanel({ openEvidence, openEncounter }: {
       <section className="border-b py-5" aria-labelledby="key-context-heading">
         <h3 id="key-context-heading" className="text-xs font-semibold uppercase tracking-[.11em] text-muted-foreground">Key context</h3>
         <dl className="mt-2 divide-y">
-          {[
-            ["Current pain", "8/10 · pelvis and lower back"],
-            ["Sleep", "Regularly interrupted"],
-            ["Medication", "Naproxen · partial relief · nausea reported"],
-            ["Work impact", "Left early twice this month"],
-          ].map(([label, value]) => (
-            <div key={label} className="py-3 first:pt-2 last:pb-0">
+          {keyContext.map(({ label, value }) => (
+            <div key={`${label}:${value}`} className="py-3 first:pt-2 last:pb-0">
               <dt className="text-[10px] font-medium text-muted-foreground">{label}</dt>
               <dd className="mt-1 text-xs font-semibold leading-5">{value}</dd>
             </div>
@@ -165,23 +201,21 @@ function PatientContextPanel({ openEvidence, openEncounter }: {
           <button type="button" onClick={openEncounter} className="text-[10px] font-semibold text-plum-700 hover:underline">View record</button>
         </div>
         <ol className="mt-3 space-y-4">
-          <li>
-            <p className="text-xs font-semibold">17 May · UCLH A&amp;E</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Severe pelvic pain · discharged with GP follow-up advice</p>
-          </li>
-          <li>
-            <p className="text-xs font-semibold">24 July · Gynaecology</p>
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">Appointment booked at UCLH</p>
-          </li>
+          {recentCare.map((event) => (
+            <li key={event.id}>
+              <p className="text-xs font-semibold">{format(new Date(event.recordedAt), "d MMM")} · {event.title}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">{event.summary}</p>
+            </li>
+          ))}
         </ol>
       </section>
 
       <section className="pt-5" aria-labelledby="evidence-overview-heading">
         <p className="text-[10px] font-semibold uppercase tracking-[.11em] text-muted-foreground">Evidence overview</p>
-        <h3 id="evidence-overview-heading" className="mt-1 text-sm font-semibold">17 supporting records</h3>
-        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">12 patient updates · 3 medication records · 2 clinical encounters</p>
+        <h3 id="evidence-overview-heading" className="mt-1 text-sm font-semibold">{evidence.length} supporting records</h3>
+        <p className="mt-2 text-[11px] leading-5 text-muted-foreground">{patientUpdates} patient updates · {clinicalEncounters} clinical encounters</p>
         <div className="mt-4 grid gap-2">
-          <Button variant="outline" size="sm" onClick={() => openEvidence("Pre-appointment briefing for Amina Khan", allSummaryEvidence)}><Eye /> View evidence</Button>
+          <Button variant="outline" size="sm" onClick={() => openEvidence(`Pre-appointment briefing for ${patient.name}`, allSummaryEvidence)}><Eye /> View evidence</Button>
           <Button asChild variant="ghost" size="sm"><Link href="/clinician/investigation">Open Clinical Investigation <ChevronRight /></Link></Button>
         </div>
       </section>
@@ -189,7 +223,8 @@ function PatientContextPanel({ openEvidence, openEncounter }: {
   );
 }
 
-function AppointmentSummary({ openEvidence, openEncounter }: {
+function AppointmentSummary({ context, openEvidence, openEncounter }: {
+  context: ClinicianContext;
   openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
   openEncounter: () => void;
 }) {
@@ -199,8 +234,20 @@ function AppointmentSummary({ openEvidence, openEncounter }: {
         <Link href="/clinician">← Back to today’s appointments</Link>
       </Button>
       <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(18rem,1fr)] xl:gap-7">
-        <AskThreadPanel patientId={demoPatient.id} openEvidence={openEvidence} />
-        <PatientContextPanel openEvidence={openEvidence} openEncounter={openEncounter} />
+        <AskThreadPanel
+          patientId={context.patient.id}
+          patient={context.patient}
+          brief={context.appointmentBrief}
+          openEvidence={openEvidence}
+        />
+        <PatientContextPanel
+          patient={context.patient}
+          events={context.timelineEvents}
+          brief={context.appointmentBrief}
+          evidence={context.evidence}
+          openEvidence={openEvidence}
+          openEncounter={openEncounter}
+        />
       </div>
     </main>
   );
@@ -223,7 +270,10 @@ function InvestigationSectionHeading({ icon: Icon, title, subtitle, action }: {
   );
 }
 
-function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, openEvidence, setEncounterEvent, runImport }: {
+function ClinicalInvestigation({ patient, observation, importedEncounter, events, uclhEncounter, encounterForDetails, openEvidence, setEncounterEvent, runImport }: {
+  patient: Patient;
+  observation: ThreadObservation;
+  importedEncounter: ImportedEncounter | null;
   events: TimelineEvent[];
   uclhEncounter: TimelineEvent | null;
   encounterForDetails: TimelineEvent | null;
@@ -232,17 +282,26 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
   runImport: () => void;
 }) {
   const medicationEvents = events.filter((event) => event.medicationDetails).slice(0, 4);
-  const urduUpdate = events.find((event) => event.language?.includes("Urdu"));
+  const urduUpdate = events.find((event) => {
+    const language = event.language?.toLowerCase();
+    return language === "ur" || language?.includes("urdu");
+  });
+  const patientUpdateCount = events.filter((event) =>
+    ["patient_text", "patient_voice", "medication_update"].includes(event.type),
+  ).length;
+  const encounterCount = events.filter((event) =>
+    ["ae_encounter", "gp_review", "specialist_review"].includes(event.type),
+  ).length;
 
   return (
     <main className="mx-auto max-w-[1320px] px-4 py-5 sm:px-6 lg:px-8">
       <div className="rounded-[1.25rem] border bg-white px-5 py-4 shadow-card sm:px-6">
-        <PatientHeader events={events} />
+        <PatientHeader events={events} patient={patient} />
         <div className="flex flex-col gap-3 pt-4 sm:flex-row sm:items-end">
           <div>
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.13em] text-plum-600"><Search className="size-3" />Inspectable evidence layer</p>
             <h2 className="mt-1 text-xl font-semibold tracking-[-.035em]">Clinical Investigation</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Explore the source updates, imported records and evidence Thread used to organise Amina’s appointment summary.</p>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">Explore the source updates, imported records and evidence Thread used to organise {patient.name}’s appointment summary.</p>
           </div>
           <Button asChild variant="outline" size="sm" className="sm:ml-auto"><Link href="/clinician/appointment-summary">Back to appointment summary</Link></Button>
         </div>
@@ -254,7 +313,7 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
             <CardHeader><InvestigationSectionHeading icon={Search} title="AI-organised observations" subtitle="Select an observation to inspect the linked evidence" /></CardHeader>
             <CardContent>
               <ul className="divide-y">
-                {seedThreadObservation.statements.map((statement) => (
+                {observation.statements.map((statement) => (
                   <li key={statement.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                     <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-plum-50 text-[10px] font-bold text-plum-700">{statement.evidenceCount}</span>
                     <span className="flex-1 text-sm leading-5">{statement.text}</span>
@@ -280,7 +339,9 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
                   <div><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-plum-600">Original · Roman Urdu</p><p className="mt-1.5 italic">“{urduUpdate.originalText}”</p></div>
                   <div className="border-t pt-4"><p className="text-[10px] font-semibold uppercase tracking-[.1em] text-muted-foreground">English translation</p><p className="mt-1.5">{urduUpdate.translatedText}</p></div>
                 </div>
-                <Button variant="ghost" size="sm" className="mt-3 px-1 text-plum-700" onClick={() => openEvidence("Amina reported that pain affected her ability to stand and work.", [EVIDENCE_IDS.voicePain, EVIDENCE_IDS.voiceWork])}>View source evidence <ChevronRight /></Button>
+                {urduUpdate.evidenceRefs?.length ? (
+                  <Button variant="ghost" size="sm" className="mt-3 px-1 text-plum-700" onClick={() => openEvidence(urduUpdate.summary, urduUpdate.evidenceRefs?.map((reference) => reference.id) ?? [])}>View source evidence <ChevronRight /></Button>
+                ) : null}
               </CardContent>
             </Card>
           ) : null}
@@ -303,7 +364,7 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
             <CardHeader><InvestigationSectionHeading icon={FlaskConical} title="Imported A&E encounter" subtitle="Observations, blood results and source record" /></CardHeader>
             <CardContent>
               <div className="rounded-xl bg-sage-50 p-4">
-                <div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 size-4 shrink-0 text-sage-700" /><div><p className="text-sm font-semibold">UCLH Emergency Department</p><p className="mt-1 text-xs text-sage-800/75">17 May 2026 · Synthetic discharge record</p></div></div>
+                <div className="flex items-start gap-3"><FileCheck2 className="mt-0.5 size-4 shrink-0 text-sage-700" /><div><p className="text-sm font-semibold">{importedEncounter?.provider ?? "Imported encounter"}</p><p className="mt-1 text-xs text-sage-800/75">{importedEncounter ? format(new Date(importedEncounter.encounterDate), "d MMM yyyy") : "Not loaded"} · Synthetic discharge record</p></div></div>
                 <div className="mt-4 flex gap-2">
                   <Button variant="outline" size="sm" disabled={!encounterForDetails} onClick={() => setEncounterEvent(encounterForDetails)} className="flex-1">View record</Button>
                   <Button size="sm" onClick={runImport} className="flex-1"><RefreshCw />{uclhEncounter ? "Re-import" : "Import"}</Button>
@@ -316,9 +377,9 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
           <Card>
             <CardHeader><InvestigationSectionHeading icon={DatabaseZap} title="Source provenance" /></CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between gap-3"><SourceBadge sourceKind="patient_reported" compact /><span className="text-xs text-muted-foreground">12 updates</span></div>
-              <div className="flex items-center justify-between gap-3"><SourceBadge sourceKind="imported_clinical_record" compact /><span className="text-xs text-muted-foreground">2 encounters</span></div>
-              <div className="flex items-center justify-between gap-3"><SourceBadge sourceKind="ai_organised" compact /><span className="text-xs text-muted-foreground">Generated 17 Jul, 14:00</span></div>
+              <div className="flex items-center justify-between gap-3"><SourceBadge sourceKind="patient_reported" compact /><span className="text-xs text-muted-foreground">{patientUpdateCount} updates</span></div>
+              <div className="flex items-center justify-between gap-3"><SourceBadge sourceKind="imported_clinical_record" compact /><span className="text-xs text-muted-foreground">{encounterCount} encounters</span></div>
+              <div className="flex items-center justify-between gap-3"><SourceBadge sourceKind="ai_organised" compact /><span className="text-xs text-muted-foreground">Generated {format(new Date(observation.recordedAt), "d MMM, HH:mm")}</span></div>
             </CardContent>
           </Card>
         </aside>
@@ -327,8 +388,12 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
   );
 }
 
-export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<ClinicianMode, "today"> }) {
-  const { events, addEvent } = useDemoData();
+export function ClinicianDashboard({ mode = "summary", context }: {
+  mode?: Exclude<ClinicianMode, "today">;
+  context: ClinicianContext;
+}) {
+  const { addEvent } = useDemoData();
+  const [events, setEvents] = React.useState(context.timelineEvents);
   const [evidenceState, setEvidenceState] = React.useState<EvidenceState | null>(null);
   const [encounterEvent, setEncounterEvent] = React.useState<TimelineEvent | null>(null);
   const [importOpen, setImportOpen] = React.useState(false);
@@ -338,11 +403,22 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<Clinic
   const [importPersisted, setImportPersisted] = React.useState<boolean | null>(null);
 
   const uclhEncounter = events.find((event) => event.type === "ae_encounter" && event.organisation?.includes("University College London")) ?? null;
-  const encounterForDetails = uclhEncounter ?? seededUclhEncounter;
+  const encounterForDetails = uclhEncounter;
+  const importedEncounter = context.importedEncounters[0] ?? null;
+  const allEvidence = React.useMemo(
+    () =>
+      Array.from(
+        new Map(
+          [...context.evidence, ...events.flatMap((event) => event.evidenceRefs ?? [])]
+            .map((reference) => [reference.id, reference]),
+        ).values(),
+      ),
+    [context.evidence, events],
+  );
 
   const openEvidence = React.useCallback((observation: string, evidenceIds: readonly string[]) => {
-    setEvidenceState({ observation, evidence: getEvidence(evidenceIds) });
-  }, []);
+    setEvidenceState({ observation, evidence: getEvidence(allEvidence, evidenceIds) });
+  }, [allEvidence]);
 
   const runImport = React.useCallback(() => {
     setImportOpen(true);
@@ -363,7 +439,7 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<Clinic
     const timeout = window.setTimeout(() => {
       const finaliseImport = async () => {
         const alreadyPresent = Boolean(uclhEncounter);
-        let importedEvent = seededUclhEncounter;
+        let importedEvent = encounterForDetails;
         let persisted = false;
         let repositoryAlreadyImported = false;
         try {
@@ -371,8 +447,8 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<Clinic
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              patientId: demoPatient.id,
-              sourceReference: seedImportedEncounter.sourceReference,
+              patientId: context.patient.id,
+              sourceReference: importedEncounter?.sourceReference,
               simulate: true,
             }),
           });
@@ -385,7 +461,15 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<Clinic
           persisted = false;
         }
 
-        if (!alreadyPresent && importedEvent) addEvent(importedEvent);
+        if (!alreadyPresent && importedEvent) {
+          addEvent(importedEvent);
+          setEvents((current) =>
+            [importedEvent, ...current].filter(
+              (event, index, all) =>
+                all.findIndex((candidate) => candidate.id === event.id) === index,
+            ),
+          );
+        }
         const outcome = alreadyPresent || repositoryAlreadyImported ? "already_present" : "added";
         setImportOutcome(outcome);
         setImportPersisted(persisted);
@@ -397,15 +481,27 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<Clinic
       void finaliseImport();
     }, 500);
     return () => window.clearTimeout(timeout);
-  }, [addEvent, importComplete, importOpen, importStep, uclhEncounter]);
+  }, [
+    addEvent,
+    context.patient.id,
+    encounterForDetails,
+    importComplete,
+    importedEncounter?.sourceReference,
+    importOpen,
+    importStep,
+    uclhEncounter,
+  ]);
 
   return (
     <div className="min-h-dvh bg-[#f4f2ef] text-[#251c21]">
       <ClinicianHeader mode={mode} />
       {mode === "summary" ? (
-        <AppointmentSummary openEvidence={openEvidence} openEncounter={() => setEncounterEvent(encounterForDetails)} />
+        <AppointmentSummary context={{ ...context, timelineEvents: events, evidence: allEvidence }} openEvidence={openEvidence} openEncounter={() => setEncounterEvent(encounterForDetails)} />
       ) : (
         <ClinicalInvestigation
+          patient={context.patient}
+          observation={context.observation}
+          importedEncounter={importedEncounter}
           events={events}
           uclhEncounter={uclhEncounter}
           encounterForDetails={encounterForDetails}
@@ -444,7 +540,7 @@ export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<Clinic
               );
             })}
           </ol>
-          {importComplete ? <div role="status" className="mt-3 rounded-xl bg-sage-50 p-3 text-xs leading-5 text-sage-800"><Check className="mr-1 inline size-3.5" />{importOutcome === "added" ? "The encounter was added to Amina’s timeline" : "The existing timeline encounter was confirmed"}. {importPersisted ? "The repository recorded this demo state." : "Repository unavailable; browser demo state only."}</div> : null}
+          {importComplete ? <div role="status" className="mt-3 rounded-xl bg-sage-50 p-3 text-xs leading-5 text-sage-800"><Check className="mr-1 inline size-3.5" />{importOutcome === "added" ? `The encounter was added to ${context.patient.name}’s timeline` : "The existing timeline encounter was confirmed"}. {importPersisted ? "The repository recorded this demo state." : "Repository unavailable; browser demo state only."}</div> : null}
           <Button className="mt-3 w-full" disabled={!importComplete} onClick={() => setImportOpen(false)}>{importComplete ? "Done" : "Importing…"}</Button>
         </DialogContent>
       </Dialog>

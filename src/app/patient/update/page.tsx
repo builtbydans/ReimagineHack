@@ -57,7 +57,10 @@ type TranscriptionPreview = {
   notice?: string;
   patientUpdateId?: string;
   evidenceId?: string;
+  timelineEventId?: string;
   persisted?: boolean;
+  rawPersisted?: boolean;
+  persistenceStatus?: "completed" | "raw_saved_timeline_failed";
 };
 
 type PatientUpdateSubmission = {

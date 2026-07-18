@@ -17,50 +17,19 @@ import {
 import { SourceBadge } from "@/components/shared/source-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EVIDENCE_IDS } from "@/data/seed";
 import { cn } from "@/lib/utils";
-import type { ContextAnswer, EvidenceReference } from "@/server/types/domain";
+import type {
+  AppointmentBrief,
+  ContextAnswer,
+  EvidenceReference,
+  Patient,
+} from "@/server/types/domain";
 
 const suggestedQuestions = [
   "When is the pain worst?",
   "Has naproxen helped?",
   "How is this affecting daily life?",
   "What happened at A&E?",
-] as const;
-
-const changesSinceLastGp = [
-  {
-    text: "Pain increased from 6/10 to 8/10",
-    evidenceIds: [EVIDENCE_IDS.secondEarlyDeparture, EVIDENCE_IDS.julyPainAndSleep],
-  },
-  {
-    text: "Pain now regularly interrupts sleep",
-    evidenceIds: [EVIDENCE_IDS.juneSleep, EVIDENCE_IDS.julyPainAndSleep],
-  },
-  {
-    text: "Left work early twice",
-    evidenceIds: [EVIDENCE_IDS.voiceWork, EVIDENCE_IDS.secondEarlyDeparture],
-  },
-  {
-    text: "Reported nausea after naproxen",
-    evidenceIds: [EVIDENCE_IDS.medicationNausea, EVIDENCE_IDS.avoidedMedication],
-  },
-  {
-    text: "Attended A&E after a severe pain episode",
-    evidenceIds: [EVIDENCE_IDS.emergencyReason, EVIDENCE_IDS.emergencyPain],
-  },
-] as const;
-
-const discussionPoints = [
-  "Why the pain has been increasing",
-  "Whether another option may cause less nausea",
-  "What happens next in her care",
-] as const;
-
-const priorities = [
-  "Better pain control",
-  "Less nausea",
-  "Confidence remaining at work",
 ] as const;
 
 type ContextQuestionResponse = {
@@ -202,9 +171,23 @@ function SupportingSources({ evidence }: { evidence: EvidenceReference[] }) {
 
 function PreparedBriefing({
   openEvidence,
+  patient,
+  brief,
 }: {
   openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
+  patient: Patient;
+  brief: AppointmentBrief;
 }) {
+  const section = (key: AppointmentBrief["sections"][number]["key"]) =>
+    brief.sections.find((candidate) => candidate.key === key);
+  const narrativeSections = [
+    section("main_concern"),
+    section("medication"),
+    section("relevant_encounter"),
+  ].filter((candidate) => candidate !== undefined);
+  const changesSinceLastGp = section("changes_since_last_review")?.items ?? [];
+  const discussionPoints = section("patient_questions")?.items ?? [];
+
   return (
     <article className="rounded-[1.35rem] bg-white px-5 py-6 shadow-card sm:px-7 sm:py-7" aria-labelledby="prepared-briefing-heading">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -213,31 +196,28 @@ function PreparedBriefing({
             Prepared briefing
           </p>
           <h2 id="prepared-briefing-heading" className="mt-2 text-xl font-semibold tracking-[-.035em] sm:text-2xl">
-            Here’s what to know before seeing Amina
+            Here’s what to know before seeing {patient.name}
           </h2>
         </div>
         <Badge variant="ai" className="bg-amber-50/70">AI-organised</Badge>
       </div>
 
-      <div className="mt-5 max-w-3xl space-y-3 text-sm leading-6 text-foreground/90">
-        <div className="flex items-start gap-2">
-          <p className="flex-1">
-            Amina is 32 and has a recorded diagnosis of endometriosis. Since her last GP appointment on 4 June, she has reported worsening pelvic and lower-back pain, increasing from 6/10 to 8/10. Pain is now interrupting her sleep and has caused her to leave work early twice.
-          </p>
-          <EvidenceLink label="Amina’s recent pain, sleep and work changes" evidenceIds={[EVIDENCE_IDS.secondEarlyDeparture, EVIDENCE_IDS.julyPainAndSleep, EVIDENCE_IDS.juneSleep]} openEvidence={openEvidence} />
-        </div>
-        <div className="flex items-start gap-2">
-          <p className="flex-1">
-            She attended UCLH A&amp;E on 17 May following a severe pain episode. Observations were stable, displayed blood results were within range, and she was discharged with GP follow-up advice.
-          </p>
-          <EvidenceLink label="Amina’s 17 May UCLH A&E attendance" evidenceIds={[EVIDENCE_IDS.emergencyReason, EVIDENCE_IDS.emergencyObservations, EVIDENCE_IDS.emergencyBloods, EVIDENCE_IDS.emergencyDisposition, EVIDENCE_IDS.emergencyFollowUp]} openEvidence={openEvidence} />
-        </div>
-        <div className="flex items-start gap-2">
-          <p className="flex-1">
-            Naproxen provides some relief but has caused nausea, and she later avoided a dose. Her gynaecology review is booked for 24 July.
-          </p>
-          <EvidenceLink label="Naproxen effects and booked gynaecology review" evidenceIds={[EVIDENCE_IDS.aprilMedicationRelief, EVIDENCE_IDS.medicationNausea, EVIDENCE_IDS.avoidedMedication, EVIDENCE_IDS.appointmentBooked]} openEvidence={openEvidence} />
-        </div>
+      <div className="mt-5 max-w-3xl space-y-4 text-sm leading-6 text-foreground/90">
+        {narrativeSections.flatMap((briefSection) =>
+          briefSection.items.map((item) => (
+            <div key={item.id} className="flex items-start gap-2">
+              <p className="flex-1">
+                <span className="font-semibold">{briefSection.title}: </span>
+                {item.text}
+              </p>
+              <EvidenceLink
+                label={item.text}
+                evidenceIds={item.evidenceIds}
+                openEvidence={openEvidence}
+              />
+            </div>
+          )),
+        )}
       </div>
 
       <div className="mt-7 grid gap-7 border-t pt-6 lg:grid-cols-[1.35fr_.9fr]">
@@ -258,12 +238,17 @@ function PreparedBriefing({
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-1">
           <section aria-labelledby="discuss-heading">
-            <h3 id="discuss-heading" className="text-sm font-semibold">Amina wants to discuss</h3>
+            <h3 id="discuss-heading" className="text-sm font-semibold">{patient.name} wants to discuss</h3>
             <ul className="mt-3 space-y-2 text-sm leading-5">
               {discussionPoints.map((item) => (
-                <li key={item} className="flex gap-2">
+                <li key={item.id} className="flex gap-2">
                   <span className="mt-2 size-1 shrink-0 rounded-full bg-plum-400" />
-                  {item}
+                  <span className="flex-1">{item.text}</span>
+                  <EvidenceLink
+                    label={item.text}
+                    evidenceIds={item.evidenceIds}
+                    openEvidence={openEvidence}
+                  />
                 </li>
               ))}
             </ul>
@@ -271,7 +256,7 @@ function PreparedBriefing({
           <section aria-labelledby="priorities-heading">
             <h3 id="priorities-heading" className="text-sm font-semibold">Patient priorities</h3>
             <div className="mt-3 flex flex-wrap gap-2">
-              {priorities.map((priority) => (
+              {brief.patientPriorities.map((priority) => (
                 <span key={priority} className="rounded-full bg-sage-50 px-3 py-1.5 text-xs font-medium text-sage-800">
                   {priority}
                 </span>
@@ -314,9 +299,13 @@ function AnswerBlock({ exchange }: { exchange: Exchange }) {
 export function AskThreadPanel({
   patientId,
   openEvidence,
+  patient,
+  brief,
 }: {
   patientId: string;
   openEvidence: (observation: string, evidenceIds: readonly string[]) => void;
+  patient: Patient;
+  brief: AppointmentBrief;
 }) {
   const [question, setQuestion] = React.useState("");
   const [exchanges, setExchanges] = React.useState<Exchange[]>([]);
@@ -363,7 +352,7 @@ export function AskThreadPanel({
         <div>
           <h1 id="ask-thread-heading" className="text-3xl font-semibold tracking-[-.045em]">Ask Thread</h1>
           <p className="mt-2 max-w-2xl text-sm leading-5 text-muted-foreground">
-            Explore Amina’s recorded health story. Answers are limited to recorded patient and clinical evidence.
+            Explore {patient.name}’s recorded health story. Answers are limited to recorded patient and clinical evidence.
           </p>
         </div>
         <Badge variant="clinical" className="w-fit py-1.5">
@@ -371,7 +360,11 @@ export function AskThreadPanel({
         </Badge>
       </header>
 
-      <PreparedBriefing openEvidence={openEvidence} />
+      <PreparedBriefing
+        openEvidence={openEvidence}
+        patient={patient}
+        brief={brief}
+      />
 
       <section className="mt-7" aria-labelledby="suggested-questions-heading">
         <h2 id="suggested-questions-heading" className="text-sm font-semibold">Suggested questions</h2>
@@ -402,7 +395,7 @@ export function AskThreadPanel({
                 </div>
                 {pending ? (
                   <div className="mt-3 flex items-center gap-2 rounded-xl bg-plum-50 px-4 py-3 text-xs text-plum-800">
-                    <LoaderCircle className="size-4 animate-spin" /> Searching Amina’s recorded history…
+                    <LoaderCircle className="size-4 animate-spin" /> Searching {patient.name}’s recorded history…
                   </div>
                 ) : null}
                 {exchange.error ? (
@@ -425,14 +418,14 @@ export function AskThreadPanel({
         }}
         className="mt-6 rounded-2xl border bg-white p-2 shadow-card"
       >
-        <label htmlFor="ask-thread-question" className="sr-only">Ask about Amina’s recorded health story</label>
+        <label htmlFor="ask-thread-question" className="sr-only">Ask about {patient.name}’s recorded health story</label>
         <div className="flex items-center gap-2">
           <input
             id="ask-thread-question"
             value={question}
             disabled={loading}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Ask about Amina’s recorded health story…"
+            placeholder={`Ask about ${patient.name}’s recorded health story…`}
             maxLength={500}
             className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground disabled:opacity-60"
           />

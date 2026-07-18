@@ -2,18 +2,20 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { isDevelopment } from "@/lib/env";
-import supabase from "@/lib/supabase";
+import { getSupabase, getSupabaseAdmin } from "@/lib/supabase";
 
 const loggedWarnings = new Set<string>();
+let fallbackVersion = 0;
 
 const warnOnce = (scope: string, reason: string) => {
   const key = `${scope}:${reason}`;
   if (loggedWarnings.has(key)) return;
 
   loggedWarnings.add(key);
-  console.warn(`[Thread fallback] ${scope}: ${reason}`);
+  console.warn(`[Thread data] ${scope}: ${reason}`);
 };
+
+export const getRepositoryFallbackVersion = () => fallbackVersion;
 
 export class RepositoryError extends Error {
   constructor(
@@ -42,22 +44,22 @@ export async function withRepositoryFallback<T>(input: {
   remote: (client: SupabaseClient) => Promise<T>;
   fallback: () => Promise<T> | T;
 }): Promise<T> {
+  const supabase = getSupabaseAdmin() ?? getSupabase();
   if (!supabase) {
-    warnOnce(input.scope, "Supabase is not configured; using synthetic seed data.");
+    fallbackVersion += 1;
+    warnOnce(input.scope, "Supabase is not configured; using seeded fallback.");
     return input.fallback();
   }
 
   try {
     return await input.remote(supabase);
   } catch (error) {
-    if (!isDevelopment) throw error;
-
+    fallbackVersion += 1;
     const message = error instanceof Error ? error.message : "unknown remote error";
     warnOnce(
       input.scope,
-      `Supabase could not be reached (${message}); using synthetic seed data.`,
+      `Supabase unavailable (${message}); using seeded fallback.`,
     );
     return input.fallback();
   }
 }
-

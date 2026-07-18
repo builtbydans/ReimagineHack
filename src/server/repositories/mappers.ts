@@ -137,6 +137,28 @@ export const evidenceRecordFromRow = (row: JsonObject): EvidenceRecord => ({
   createdAt: String(row.created_at),
 });
 
+export const liveEvidenceFromRow = (row: JsonObject): EvidenceReference => {
+  const metadata = objectValue(row.metadata);
+  const translatedContent = row.translated_content
+    ? String(row.translated_content)
+    : undefined;
+  const originalContent = String(row.original_content ?? "");
+
+  return {
+    id: String(row.id),
+    eventId: String(row.source_id ?? row.id),
+    sourceKind: "patient_reported",
+    label: String(row.title ?? "Patient voice update"),
+    excerpt: translatedContent ?? originalContent,
+    originalExcerpt: originalContent,
+    ...(translatedContent ? { translatedExcerpt: translatedContent } : {}),
+    recordedAt: String(row.occurred_at ?? row.created_at),
+    ...(metadata.detectedLanguage
+      ? { language: String(metadata.detectedLanguage) }
+      : {}),
+  };
+};
+
 export const evidenceFromRow = (row: JsonObject): EvidenceReference => ({
   id: String(row.id),
   eventId: String(row.supporting_event_id ?? row.event_id),
@@ -209,6 +231,7 @@ export const timelineEventFromRow = (
     ...(structured.metadata
       ? { metadata: structured.metadata as Record<string, unknown> }
       : {}),
+    structuredData: structured,
     ...(evidenceRefs.length ? { evidenceRefs } : {}),
   };
 };
@@ -228,7 +251,7 @@ export const timelineEventToRow = (event: TimelineEvent) => ({
   translated_text: event.translatedText ?? null,
   audio_url: event.audioUrl ?? null,
   severity: event.severity ?? null,
-  structured_data: {
+  structured_data: event.structuredData ?? {
     bodyLocations: event.bodyLocations ?? [],
     symptoms: event.symptoms ?? [],
     functionalImpacts: event.functionalImpacts ?? [],

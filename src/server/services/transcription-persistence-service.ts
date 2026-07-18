@@ -10,7 +10,15 @@ import {
   patientUpdateRepository,
   type PatientUpdateRepository,
 } from "@/server/repositories/patient-update-repository";
-import type { EvidenceRecord, PatientUpdate } from "@/server/types/domain";
+import {
+  timelineRepository,
+  type TimelineRepository,
+} from "@/server/repositories/timeline-repository";
+import type {
+  EvidenceRecord,
+  PatientUpdate,
+  TimelineEvent,
+} from "@/server/types/domain";
 import type { TranscriptionResult } from "@/server/services/transcription-service";
 
 const nonEmptyExactString = z.string().refine((value) => value.trim().length > 0);
@@ -32,6 +40,8 @@ const persistenceInputSchema = z.object({
 export type PersistedVoiceTranscription = {
   patientUpdate: PatientUpdate;
   evidence: EvidenceRecord;
+  timelineEvent?: TimelineEvent;
+  timelineProjection: "completed" | "failed";
 };
 
 export class TranscriptionPersistenceError extends Error {
@@ -50,6 +60,7 @@ export class TranscriptionPersistenceService {
   constructor(
     private readonly patientUpdates: PatientUpdateRepository,
     private readonly evidence: EvidenceRepository,
+    private readonly timeline: TimelineRepository,
   ) {}
 
   async persistVoiceTranscription(input: {
@@ -106,7 +117,43 @@ export class TranscriptionPersistenceService {
         evidenceId: evidence.id,
       });
 
-      return { patientUpdate, evidence };
+      try {
+        const timelineEvent = await this.timeline.createLiveVoiceProjection({
+          patientId,
+          patientUpdateId: patientUpdate.id,
+          evidenceRecordId: evidence.id,
+          originalTranscript: transcription.originalTranscript,
+          ...(transcription.englishTranslation === undefined
+            ? {}
+            : { englishTranslation: transcription.englishTranslation }),
+          ...(transcription.detectedLanguage === undefined
+            ? {}
+            : { detectedLanguage: transcription.detectedLanguage }),
+          transcriptionMode: "runware",
+          occurredAt,
+        });
+
+        console.info("[Thread persistence] Timeline projection saved", {
+          patientId,
+          timelineEventId: timelineEvent.id,
+        });
+        return {
+          patientUpdate,
+          evidence,
+          timelineEvent,
+          timelineProjection: "completed",
+        };
+      } catch (timelineError) {
+        console.error(
+          "[Thread persistence] Raw transcription saved but timeline projection failed",
+          timelineError,
+        );
+        return {
+          patientUpdate,
+          evidence,
+          timelineProjection: "failed",
+        };
+      }
     } catch (error) {
       if (patientUpdate) {
         try {
@@ -131,4 +178,5 @@ export const transcriptionPersistenceService =
   new TranscriptionPersistenceService(
     patientUpdateRepository,
     evidenceRepository,
+    timelineRepository,
   );

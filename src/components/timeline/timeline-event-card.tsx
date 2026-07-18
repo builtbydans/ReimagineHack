@@ -77,6 +77,9 @@ export function TimelineEventCard({
             {isAi && onViewEvidence ? (
               <Button variant="ghost" size="sm" onClick={() => onViewEvidence(event)} className="h-8 px-2 text-plum-700">{event.evidenceRefs?.length ?? 0} sources <ChevronRight /></Button>
             ) : null}
+            {!isAi && event.evidenceRefs?.length && onViewEvidence ? (
+              <Button variant="ghost" size="sm" onClick={() => onViewEvidence(event)} className="h-8 px-2 text-plum-700">View evidence <ChevronRight /></Button>
+            ) : null}
             {isEncounter && onViewEncounter ? (
               <Button variant="ghost" size="sm" onClick={() => onViewEncounter(event)} className="h-8 px-2 text-sage-700">View record <ArrowUpRight /></Button>
             ) : null}

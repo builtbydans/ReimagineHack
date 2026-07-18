@@ -13,6 +13,30 @@ import {
 } from "@/server/repositories/repository-support";
 
 export class ImportedEncounterRepository {
+  async listByPatient(patientId: string): Promise<ImportedEncounter[]> {
+    return withRepositoryFallback({
+      scope: "ImportedEncounterRepository.listByPatient",
+      remote: async (client) => {
+        const { data, error } = await client
+          .from("imported_encounters")
+          .select("*")
+          .eq("patient_id", patientId)
+          .order("encounter_date", { ascending: false });
+
+        requireSuccessfulQuery("ImportedEncounterRepository.listByPatient", error);
+        return (data ?? []).map((row) =>
+          importedEncounterFromRow(row as unknown as Record<string, unknown>),
+        );
+      },
+      fallback: () =>
+        structuredClone(
+          fallbackStore.importedEncounters.filter(
+            (encounter) => encounter.patientId === patientId,
+          ),
+        ),
+    });
+  }
+
   async findBySourceReference(
     sourceReference: string,
   ): Promise<ImportedEncounter | null> {
@@ -73,4 +97,3 @@ export class ImportedEncounterRepository {
 }
 
 export const importedEncounterRepository = new ImportedEncounterRepository();
-

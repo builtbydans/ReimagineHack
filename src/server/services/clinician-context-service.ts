@@ -1,0 +1,147 @@
+import "server-only";
+
+import {
+  demoPatient,
+  seedAppointmentBrief,
+  seedThreadObservation,
+} from "@/data/seed";
+import { getSupabaseAdmin } from "@/lib/supabase";
+import { appointmentBriefRepository } from "@/server/repositories/appointment-brief-repository";
+import { importedEncounterRepository } from "@/server/repositories/imported-encounter-repository";
+import { patientRepository } from "@/server/repositories/patient-repository";
+import { getRepositoryFallbackVersion } from "@/server/repositories/repository-support";
+import { timelineRepository } from "@/server/repositories/timeline-repository";
+import type {
+  ClinicianContext,
+  ObservationCategory,
+  ThreadObservation,
+  TimelineEvent,
+} from "@/server/types/domain";
+
+const objectValue = (value: unknown): Record<string, unknown> =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+
+const stringArray = (value: unknown): string[] =>
+  Array.isArray(value) ? value.map(String) : [];
+
+const categoryFor = (text: string): ObservationCategory => {
+  const lower = text.toLowerCase();
+  if (lower.includes("sleep")) return "sleep";
+  if (lower.includes("medication") || lower.includes("nausea")) {
+    return "medication";
+  }
+  if (lower.includes("work")) return "functional_impact";
+  if (lower.includes("pain") || lower.includes("severity")) {
+    return "symptom_trend";
+  }
+  return "continuity";
+};
+
+const observationFromTimeline = (
+  events: TimelineEvent[],
+): ThreadObservation | null => {
+  const event = events.find((candidate) => candidate.type === "ai_observation");
+  if (!event) return null;
+
+  const structured = event.structuredData ?? {};
+  const rawStatements = Array.isArray(structured.observations)
+    ? structured.observations
+    : [];
+  if (!rawStatements.length) return null;
+  const sourceEventIds = stringArray(structured.supportingEventIds);
+  const statements = rawStatements.map((value, index) => {
+    const statement = objectValue(value);
+    const text = String(statement.text ?? "Recorded context");
+    const evidenceIds = stringArray(
+      statement.evidenceReferenceIds ?? statement.evidenceIds,
+    );
+    return {
+      id: `${event.id}-statement-${index + 1}`,
+      category: categoryFor(text),
+      text,
+      evidenceIds,
+      evidenceCount: evidenceIds.length,
+      sourceEventIds,
+      uncertainty:
+        "Thread organised this from the linked records. It has not been clinically verified.",
+    };
+  });
+
+  return {
+    id: event.id,
+    patientId: event.patientId,
+    recordedAt: event.recordedAt,
+    title: event.title,
+    summary: event.summary,
+    evidenceSummary: String(
+      structured.supportingSummary ?? `${event.evidenceRefs?.length ?? 0} linked sources`,
+    ),
+    badge: "AI-organised",
+    clinicalVerificationStatus: "not_clinically_verified",
+    statements,
+    evidenceIds: [...new Set(statements.flatMap((statement) => statement.evidenceIds))],
+    sourceEventIds,
+    ...(event.evidenceRefs ? { evidenceRefs: event.evidenceRefs } : {}),
+  };
+};
+
+export class ClinicianContextService {
+  async getContext(patientId: string): Promise<ClinicianContext> {
+    const fallbackVersion = getRepositoryFallbackVersion();
+    const patient = await patientRepository.findById(patientId);
+    const resolvedPatient = patient ??
+      (patientId === demoPatient.id ? structuredClone(demoPatient) : null);
+    if (!resolvedPatient) throw new Error("Amina's patient record was not found.");
+
+    const [timelineEvents, appointmentBrief, importedEncounters] =
+      await Promise.all([
+        timelineRepository.listByPatient(patientId),
+        appointmentBriefRepository.findLatestByPatient(patientId),
+        importedEncounterRepository.listByPatient(patientId),
+      ]);
+    const resolvedBrief = appointmentBrief ?? structuredClone(seedAppointmentBrief);
+    const observation =
+      observationFromTimeline(timelineEvents) ?? structuredClone(seedThreadObservation);
+    const evidence = Array.from(
+      new Map(
+        timelineEvents
+          .flatMap((event) => event.evidenceRefs ?? [])
+          .map((reference) => [reference.id, reference]),
+      ).values(),
+    );
+    const dataSource =
+      getSupabaseAdmin() &&
+      getRepositoryFallbackVersion() === fallbackVersion &&
+      patient &&
+      appointmentBrief
+        ? "supabase"
+        : "fallback";
+
+    if (dataSource === "supabase") {
+      console.info("[Thread data] Loaded clinician context from Supabase", {
+        patientId,
+        timelineEvents: timelineEvents.length,
+        evidence: evidence.length,
+        importedEncounters: importedEncounters.length,
+      });
+    } else {
+      console.warn("[Thread data] Supabase unavailable; using seeded fallback", {
+        patientId,
+      });
+    }
+
+    return {
+      patient: resolvedPatient,
+      timelineEvents,
+      evidence,
+      appointmentBrief: resolvedBrief,
+      importedEncounters,
+      observation,
+      dataSource,
+    };
+  }
+}
+
+export const clinicianContextService = new ClinicianContextService();

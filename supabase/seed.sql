@@ -3,6 +3,54 @@
 
 begin;
 
+-- Normalise an existing legacy Amina row before applying the canonical seed.
+-- The temporary copy keeps foreign keys valid while child rows are reassigned.
+insert into public.patients (
+  id,
+  name,
+  date_of_birth,
+  condition,
+  preferred_language,
+  avatar_url,
+  created_at,
+  updated_at
+)
+select
+  '11111111-1111-4111-8111-111111111111',
+  name,
+  date_of_birth,
+  condition,
+  preferred_language,
+  avatar_url,
+  created_at,
+  updated_at
+from public.patients
+where id = ('10000000-0000-4000-8000-' || '000000000001')::uuid
+on conflict (id) do nothing;
+
+update public.timeline_events
+set patient_id = '11111111-1111-4111-8111-111111111111'
+where patient_id = ('10000000-0000-4000-8000-' || '000000000001')::uuid;
+
+update public.appointment_briefs
+set patient_id = '11111111-1111-4111-8111-111111111111'
+where patient_id = ('10000000-0000-4000-8000-' || '000000000001')::uuid;
+
+update public.imported_encounters
+set patient_id = '11111111-1111-4111-8111-111111111111'
+where patient_id = ('10000000-0000-4000-8000-' || '000000000001')::uuid;
+
+update public.patient_updates
+set patient_id = '11111111-1111-4111-8111-111111111111'
+where patient_id = ('10000000-0000-4000-8000-' || '000000000001')::uuid;
+
+update public.evidence_records
+set patient_id = '11111111-1111-4111-8111-111111111111'
+where patient_id = ('10000000-0000-4000-8000-' || '000000000001')::uuid;
+
+delete from public.patients
+where id = ('10000000-0000-4000-8000-' || '000000000001')::uuid;
+
 insert into public.patients (
   id,
   name,
@@ -14,7 +62,7 @@ insert into public.patients (
   updated_at
 )
 values (
-  '10000000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
   'Amina Khan',
   '1993-10-11',
   'Endometriosis',
@@ -53,7 +101,7 @@ insert into public.timeline_events (
 values
   (
     '20000000-0000-4000-8000-000000000001',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_text',
     'Pelvic pain before period',
     'Amina reported pelvic pain at 4/10 and fatigue, while still managing her normal activities.',
@@ -84,7 +132,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000002',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'medication_update',
     'Naproxen gave partial relief',
     'Amina took naproxen and reported partial pain relief with no side effects recorded.',
@@ -119,7 +167,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000003',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_text',
     'Pain increased before next period',
     'Pelvic pain was 5/10 with fatigue; Amina completed work and expected her period the following day.',
@@ -150,7 +198,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000004',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'ae_encounter',
     'UCLH Emergency Department',
     'Amina attended with severe pelvic pain rated 8/10. Observations were stable, displayed blood results were within range, and she was discharged with follow-up and return advice.',
@@ -201,7 +249,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000005',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_text',
     'Pain eased after A&E visit',
     'Pain had improved since the emergency visit, but pelvic heaviness continued and Amina worried the severe pain might return.',
@@ -231,7 +279,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000006',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'gp_review',
     'GP follow-up after A&E',
     'The GP reviewed Amina after the emergency attendance, discussed naproxen, made a gynaecology referral, and asked her to track symptoms.',
@@ -272,7 +320,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000007',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_voice',
     'Pain spread to lower back at work',
     'In an Urdu voice update, Amina reported 7/10 lower abdominal pain spreading to her lower back and said she had to leave work early.',
@@ -308,7 +356,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000008',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'medication_update',
     'Nausea after prescribed medication',
     'Amina reported nausea after taking her prescribed pain medication and felt unsure about taking another dose.',
@@ -343,7 +391,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000009',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_text',
     'Fatigue and poor sleep',
     'Amina reported ongoing fatigue, pelvic pain at 5/10, and poor sleep without missing work.',
@@ -375,7 +423,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000010',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'referral',
     'Gynaecology appointment booked',
     'A consultant gynaecology review was booked for 24 July 2026 at University College London Hospital.',
@@ -410,7 +458,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000011',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_voice',
     'Pain woke Amina overnight',
     'Amina reported pelvic and lower-back pain at 8/10 that woke her overnight; she avoided medication because of earlier nausea.',
@@ -453,7 +501,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000012',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_text',
     'Pain affected confidence at work',
     'When her period began, standing increased Amina’s discomfort. She nearly called in sick, left work early, and wanted a pain option that did not cause nausea.',
@@ -493,7 +541,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000014',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'gp_review',
     'GP symptom-tracking review',
     'The imported GP record states that Amina continued to report cyclical pelvic pain. The referral remained in progress and symptom tracking was discussed.',
@@ -518,7 +566,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000015',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'patient_text',
     'Left work early for a second time',
     'Amina reported pain at 6/10 and left her shift early after standing made it worse.',
@@ -544,7 +592,7 @@ values
   ),
   (
     '20000000-0000-4000-8000-000000000013',
-    '10000000-0000-4000-8000-000000000001',
+    '11111111-1111-4111-8111-111111111111',
     'ai_observation',
     'What Thread has noticed',
     'Recorded pelvic pain increased across the last three cycles. Recent updates also describe interrupted sleep, medication-related nausea concerns, and increasing impact on work.',
@@ -867,7 +915,7 @@ insert into public.appointment_briefs (
 )
 values (
   '40000000-0000-4000-8000-000000000001',
-  '10000000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
   '2026-07-24T10:30:00+01:00',
   'draft',
   $json$
@@ -1056,7 +1104,7 @@ insert into public.imported_encounters (
 )
 values (
   '50000000-0000-4000-8000-000000000001',
-  '10000000-0000-4000-8000-000000000001',
+  '11111111-1111-4111-8111-111111111111',
   '20000000-0000-4000-8000-000000000004',
   'University College London Hospital',
   'Emergency Department attendance',

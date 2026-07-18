@@ -1,4 +1,7 @@
-export const DEMO_PATIENT_ID = "10000000-0000-4000-8000-000000000001";
+import { AMINA_PATIENT_ID } from "@/lib/constants";
+
+/** @deprecated Prefer AMINA_PATIENT_ID for new code. */
+export const DEMO_PATIENT_ID = AMINA_PATIENT_ID;
 
 export const TIMELINE_EVENT_IDS = {
   aprilTextUpdate: "20000000-0000-4000-8000-000000000001",

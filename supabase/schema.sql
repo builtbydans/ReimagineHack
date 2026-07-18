@@ -1,9 +1,9 @@
 -- Thread V1 database schema.
 --
--- This schema is intentionally lightweight for the synthetic hackathon demo. Before
--- production use, enable row-level security and add policies, tenant isolation,
--- consent/audit controls, retention rules, encryption/key management, and the wider
--- clinical-information governance required for health data.
+-- This schema is intentionally lightweight for the synthetic hackathon demo. RLS is
+-- enabled without permissive anonymous policies. Production still requires authenticated
+-- policies, tenant isolation, consent/audit controls, retention rules, encryption/key
+-- management, and the wider clinical-information governance required for health data.
 
 begin;
 
@@ -105,6 +105,37 @@ create table if not exists public.imported_encounters (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.patient_updates (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  input_type text not null check (
+    input_type in ('voice', 'text', 'symptom', 'medication')
+  ),
+  original_text text not null,
+  original_language text not null,
+  english_translation text,
+  processing_status text not null check (
+    processing_status in ('pending', 'processing', 'completed', 'failed')
+  ),
+  processing_error text,
+  occurred_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.evidence_records (
+  id uuid primary key default gen_random_uuid(),
+  patient_id uuid not null references public.patients(id) on delete cascade,
+  source_type text not null,
+  source_id uuid references public.patient_updates(id) on delete set null,
+  title text not null,
+  original_content text not null,
+  translated_content text,
+  occurred_at timestamptz not null,
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists timeline_events_patient_recorded_at_idx
   on public.timeline_events (patient_id, recorded_at desc);
 
@@ -125,6 +156,15 @@ create index if not exists appointment_briefs_patient_date_idx
 
 create index if not exists imported_encounters_patient_date_idx
   on public.imported_encounters (patient_id, encounter_date desc);
+
+create index if not exists patient_updates_patient_occurred_at_idx
+  on public.patient_updates (patient_id, occurred_at desc);
+
+create index if not exists evidence_records_patient_occurred_at_idx
+  on public.evidence_records (patient_id, occurred_at desc);
+
+create index if not exists evidence_records_source_id_idx
+  on public.evidence_records (source_id);
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -151,6 +191,19 @@ create trigger appointment_briefs_set_updated_at
 before update on public.appointment_briefs
 for each row execute function public.set_updated_at();
 
+drop trigger if exists patient_updates_set_updated_at on public.patient_updates;
+create trigger patient_updates_set_updated_at
+before update on public.patient_updates
+for each row execute function public.set_updated_at();
+
+alter table public.patients enable row level security;
+alter table public.timeline_events enable row level security;
+alter table public.evidence_references enable row level security;
+alter table public.appointment_briefs enable row level security;
+alter table public.imported_encounters enable row level security;
+alter table public.patient_updates enable row level security;
+alter table public.evidence_records enable row level security;
+
 comment on table public.patients is
   'Synthetic demo patient records. Production requires full access control and health-data governance.';
 comment on table public.timeline_events is
@@ -161,5 +214,9 @@ comment on table public.appointment_briefs is
   'Patient-reviewed appointment context. It is not a diagnosis or treatment recommendation.';
 comment on table public.imported_encounters is
   'Imported encounter payloads. The V1 seed contains synthetic demonstration data only.';
+comment on table public.patient_updates is
+  'Raw patient-reported updates. Server-only writes preserve the source transcript.';
+comment on table public.evidence_records is
+  'Raw evidence records linked to patient updates. Server-only writes preserve provenance.';
 
 commit;

@@ -120,6 +120,7 @@ export interface TimelineEvent {
   encounterDetails?: EncounterDetails;
   evidenceRefs?: EvidenceReference[];
   metadata?: Record<string, unknown>;
+  structuredData?: Record<string, unknown>;
 }
 
 export interface AppointmentDetails {
@@ -280,6 +281,16 @@ export interface ImportedEncounter {
   synthetic: true;
   rawPayload: Record<string, unknown>;
   structuredData: EncounterDetails;
+}
+
+export interface ClinicianContext {
+  patient: Patient;
+  timelineEvents: TimelineEvent[];
+  evidence: EvidenceReference[];
+  appointmentBrief: AppointmentBrief;
+  importedEncounters: ImportedEncounter[];
+  observation: ThreadObservation;
+  dataSource: "supabase" | "fallback";
 }
 
 export interface EncounterImportStep {

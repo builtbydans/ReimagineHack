@@ -175,6 +175,11 @@ The schema includes:
 - `evidence_references`
 - `appointment_briefs`
 - `imported_encounters`
+- `patient_updates`
+- `evidence_records`
+
+See [`docs/supabase-demo-runbook.md`](docs/supabase-demo-runbook.md) for the
+repeatable seed, verification, recording, clinician-refresh, and Vercel steps.
 
 The SQL comments explicitly call out that production use requires full identity, row-level access control, consent, auditing, retention, governance, and clinical safety review. The V1 intentionally avoids pretending those concerns are solved.
 

@@ -10,6 +10,7 @@ import { fallbackStore } from "@/server/repositories/fallback-store";
 import {
   evidenceFromRow,
   evidenceRecordFromRow,
+  liveEvidenceFromRow,
 } from "@/server/repositories/mappers";
 import {
   RepositoryError,
@@ -136,6 +137,28 @@ export class EvidenceRepository {
             (reference) => reference.observationId === observationId,
           ),
         ),
+    });
+  }
+
+  async listLiveForPatient(patientId: string): Promise<EvidenceReference[]> {
+    const validatedPatientId = z.string().uuid().parse(patientId);
+    return withRepositoryFallback({
+      scope: "EvidenceRepository.listLiveForPatient",
+      remote: async (client) => {
+        const { data, error } = await client
+          .from("evidence_records")
+          .select(
+            "id, patient_id, source_type, source_id, title, original_content, translated_content, occurred_at, metadata, created_at",
+          )
+          .eq("patient_id", validatedPatientId)
+          .order("occurred_at", { ascending: false });
+
+        requireSuccessfulQuery("EvidenceRepository.listLiveForPatient", error);
+        return (data ?? []).map((row) =>
+          liveEvidenceFromRow(row as unknown as Record<string, unknown>),
+        );
+      },
+      fallback: () => [],
     });
   }
 
