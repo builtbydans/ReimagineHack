@@ -22,6 +22,7 @@ export const env = {
     optional(process.env.SUPABASE_SECRET_KEY) ??
     optional(process.env.SUPABASE_SERVICE_ROLE_KEY),
   geminiApiKey: optional(process.env.GEMINI_API_KEY),
+  geminiModel: optional(process.env.GEMINI_MODEL),
   runwareApiKey: optional(process.env.RUNWARE_API_KEY),
   transcriptionFallbackEnabled: booleanFlag(
     process.env.TRANSCRIPTION_FALLBACK_ENABLED,

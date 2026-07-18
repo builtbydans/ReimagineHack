@@ -109,10 +109,34 @@ export class ClinicianContextService {
     };
     const observation =
       observationFromTimeline(timelineEvents) ?? structuredClone(seedThreadObservation);
+    const timelineEvidence = timelineEvents.flatMap((event) => {
+      if (event.evidenceRefs?.length) return event.evidenceRefs;
+      if (event.type === "ai_observation") return [];
+      return [
+        {
+          id: event.id,
+          eventId: event.id,
+          sourceKind: event.sourceKind,
+          label: event.title,
+          excerpt: event.translatedText ?? event.summary,
+          ...(event.originalText
+            ? { originalExcerpt: event.originalText }
+            : {}),
+          ...(event.translatedText
+            ? { translatedExcerpt: event.translatedText }
+            : {}),
+          recordedAt: event.recordedAt,
+          ...(event.language ? { language: event.language } : {}),
+          ...(event.organisation
+            ? { organisation: event.organisation }
+            : {}),
+        },
+      ];
+    });
     const evidence = Array.from(
       new Map(
         [
-          ...timelineEvents.flatMap((event) => event.evidenceRefs ?? []),
+          ...timelineEvidence,
           ...seedEvidenceReferences.filter((reference) =>
             resolvedBrief.evidenceIds.includes(reference.id),
           ),
@@ -132,7 +156,7 @@ export class ClinicianContextService {
       patientId,
       patientFound: Boolean(patient),
       timelineCount: timelineEvents.length,
-      briefFound: false,
+      briefFound: Boolean(appointmentBrief),
       encounterCount: importedEncounters.length,
       evidenceCount: evidence.length,
       source: dataSource,

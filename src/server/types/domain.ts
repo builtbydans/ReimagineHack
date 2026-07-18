@@ -293,6 +293,80 @@ export interface ClinicianContext {
   dataSource: "supabase" | "fallback";
 }
 
+export type AiEvidenceSourceType =
+  | "patient_text"
+  | "patient_voice"
+  | "voice_transcript"
+  | "clinical_encounter"
+  | "medication_update"
+  | "referral"
+  | "other";
+
+export type AiEvidenceItem = {
+  id: string;
+  sourceType: AiEvidenceSourceType;
+  title: string;
+  occurredAt: string;
+  originalText: string | null;
+  translatedText: string | null;
+  summary: string | null;
+  organisation: string | null;
+  metadata: Record<string, unknown>;
+};
+
+export type ClinicalContext = {
+  patient: {
+    id: string;
+    name: string;
+    dateOfBirth: string | null;
+    age: number | null;
+    condition: string | null;
+    preferredLanguage: string | null;
+  };
+  lastGpEncounterAt: string | null;
+  upcomingAppointment: {
+    title: string;
+    organisation: string | null;
+    appointmentAt: string;
+  } | null;
+  evidence: AiEvidenceItem[];
+};
+
+export type AppointmentSummaryStatement = {
+  statement: string;
+  evidenceIds: string[];
+};
+
+export type AppointmentSummary = {
+  openingBrief: string;
+  changesSinceLastEncounter: AppointmentSummaryStatement[];
+  discussionPoints: AppointmentSummaryStatement[];
+  patientPriorities: AppointmentSummaryStatement[];
+  suggestedQuestions: string[];
+};
+
+export type GeneratedAppointmentSummary = {
+  summary: AppointmentSummary;
+  mode: "gemini" | "fallback";
+  generatedAt: string;
+  model?: string;
+  notice?: string;
+};
+
+export type AskThreadSupportLevel =
+  | "supported"
+  | "partially_supported"
+  | "not_found";
+
+export type AskThreadResult = {
+  answer: string;
+  supportLevel: AskThreadSupportLevel;
+  missingInformation: string | null;
+  evidence: EvidenceReference[];
+  mode: "gemini" | "fallback";
+  generatedAt: string;
+};
+
 export interface EncounterImportStep {
   id: string;
   label: string;
