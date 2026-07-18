@@ -2,10 +2,10 @@ import { ClinicianDashboard } from "@/components/clinician/clinician-dashboard";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Clinician context | Thread",
-  description: "Amina Khan’s evidence-backed longitudinal health context.",
+  title: "Appointment summary | Thread",
+  description: "Amina Khan’s concise, evidence-backed appointment summary.",
 };
 
 export default function ClinicianPage() {
-  return <ClinicianDashboard />;
+  return <ClinicianDashboard mode="summary" />;
 }

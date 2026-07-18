@@ -30,6 +30,17 @@ export const seedEvidenceReferences: EvidenceReference[] = [
     language: "English",
   },
   {
+    id: EVIDENCE_IDS.aprilMedicationRelief,
+    eventId: TIMELINE_EVENT_IDS.aprilMedicationUpdate,
+    observationId: THREAD_OBSERVATION_ID,
+    sourceKind: "patient_reported",
+    label: "18 April medication update",
+    excerpt: "I took naproxen and it helped a little. I did not notice any side effects.",
+    field: "medicationDetails",
+    recordedAt: "2026-04-18T13:25:00+01:00",
+    language: "English",
+  },
+  {
     id: EVIDENCE_IDS.mayPain,
     eventId: TIMELINE_EVENT_IDS.mayTextUpdate,
     observationId: THREAD_OBSERVATION_ID,

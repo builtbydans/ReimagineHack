@@ -5,6 +5,7 @@ import {
   DEMO_PATIENT_ID,
   MAX_AUDIO_UPLOAD_BYTES,
 } from "@/lib/constants";
+import type { ContextAnswer } from "@/server/types/domain";
 
 const isoDateTime = z
   .string()
@@ -64,6 +65,29 @@ export type ReviewedPatientEventInput = z.infer<typeof reviewedPatientEventSchem
 
 export const timelineQuerySchema = z.object({
   patientId: z.string().uuid().default(DEMO_PATIENT_ID),
+});
+
+export const contextQuestionInputSchema = z.object({
+  patientId: z.string().uuid().default(DEMO_PATIENT_ID),
+  question: z
+    .string()
+    .trim()
+    .min(3, "Ask a focused question about the recorded history.")
+    .max(500, "Keep the question under 500 characters."),
+});
+
+export type ContextQuestionInput = z.infer<typeof contextQuestionInputSchema>;
+
+export const contextAnswerSchema: z.ZodType<ContextAnswer> = z.object({
+  answer: z.string().trim().min(1).max(2_000),
+  confidence: z.enum(["supported", "partial", "insufficient"]),
+  evidenceIds: z.array(z.string().uuid()).max(12),
+  missingInformation: z.string().trim().min(1).max(1_000).optional(),
+  safetyClassification: z.enum([
+    "patient_context",
+    "clinical_decision_request",
+    "out_of_scope",
+  ]),
 });
 
 export const encounterImportInputSchema = z.object({

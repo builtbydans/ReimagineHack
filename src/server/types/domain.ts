@@ -50,6 +50,24 @@ export interface EvidenceReference {
   uncertainty?: string;
 }
 
+export type ContextAnswerConfidence =
+  | "supported"
+  | "partial"
+  | "insufficient";
+
+export type ContextAnswerSafetyClassification =
+  | "patient_context"
+  | "clinical_decision_request"
+  | "out_of_scope";
+
+export type ContextAnswer = {
+  answer: string;
+  confidence: ContextAnswerConfidence;
+  evidenceIds: string[];
+  missingInformation?: string;
+  safetyClassification: ContextAnswerSafetyClassification;
+};
+
 export interface MedicationDetails {
   medicationName?: string;
   action?: string;
