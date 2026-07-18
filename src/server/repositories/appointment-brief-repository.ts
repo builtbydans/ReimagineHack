@@ -6,12 +6,9 @@ import type {
 } from "@/server/types/domain";
 
 import { fallbackStore } from "@/server/repositories/fallback-store";
+import { validateAppointmentBrief } from "@/server/repositories/mappers";
 import {
-  appointmentBriefFromRow,
-  appointmentBriefToRow,
-} from "@/server/repositories/mappers";
-import {
-  requireSuccessfulQuery,
+  RepositoryError,
   withRepositoryFallback,
 } from "@/server/repositories/repository-support";
 
@@ -19,23 +16,11 @@ export class AppointmentBriefRepository {
   async findLatestByPatient(patientId: string): Promise<AppointmentBrief | null> {
     return withRepositoryFallback({
       scope: "AppointmentBriefRepository.findLatestByPatient",
-      remote: async (client) => {
-        const { data, error } = await client
-          .from("appointment_briefs")
-          .select("*")
-          .eq("patient_id", patientId)
-          .order("appointment_date", { ascending: false })
-          .order("updated_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        requireSuccessfulQuery(
+      remote: async () => {
+        throw new RepositoryError(
           "AppointmentBriefRepository.findLatestByPatient",
-          error,
+          "The authoritative live schema has no public.appointment_briefs table.",
         );
-        return data
-          ? appointmentBriefFromRow(data as unknown as Record<string, unknown>)
-          : null;
       },
       fallback: () => {
         const briefs = fallbackStore.appointmentBriefs
@@ -49,7 +34,9 @@ export class AppointmentBriefRepository {
                 Date.parse(right.generatedAt) - Date.parse(left.generatedAt);
             },
           );
-        return briefs[0] ? structuredClone(briefs[0]) : null;
+        return briefs[0]
+          ? validateAppointmentBrief(structuredClone(briefs[0]))
+          : null;
       },
     });
   }
@@ -57,16 +44,10 @@ export class AppointmentBriefRepository {
   async save(brief: AppointmentBrief): Promise<AppointmentBrief> {
     return withRepositoryFallback({
       scope: "AppointmentBriefRepository.save",
-      remote: async (client) => {
-        const { data, error } = await client
-          .from("appointment_briefs")
-          .upsert(appointmentBriefToRow(brief), { onConflict: "id" })
-          .select("*")
-          .single();
-
-        requireSuccessfulQuery("AppointmentBriefRepository.save", error);
-        return appointmentBriefFromRow(
-          data as unknown as Record<string, unknown>,
+      remote: async () => {
+        throw new RepositoryError(
+          "AppointmentBriefRepository.save",
+          "The authoritative live schema has no public.appointment_briefs table.",
         );
       },
       fallback: () => {

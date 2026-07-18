@@ -4,10 +4,11 @@ import type { ImportedEncounter } from "@/server/types/domain";
 
 import { fallbackStore } from "@/server/repositories/fallback-store";
 import {
-  importedEncounterFromRow,
-  importedEncounterToRow,
+  clinicalEncounterInsertFromImportedEncounter,
+  mapImportedEncounter,
 } from "@/server/repositories/mappers";
 import {
+  RepositoryError,
   requireSuccessfulQuery,
   withRepositoryFallback,
 } from "@/server/repositories/repository-support";
@@ -18,15 +19,15 @@ export class ImportedEncounterRepository {
       scope: "ImportedEncounterRepository.listByPatient",
       remote: async (client) => {
         const { data, error } = await client
-          .from("imported_encounters")
-          .select("*")
+          .from("clinical_encounters")
+          .select(
+            "id, patient_id, encounter_type, organisation, title, summary, raw_record, occurred_at, created_at, updated_at",
+          )
           .eq("patient_id", patientId)
-          .order("encounter_date", { ascending: false });
+          .order("occurred_at", { ascending: false });
 
         requireSuccessfulQuery("ImportedEncounterRepository.listByPatient", error);
-        return (data ?? []).map((row) =>
-          importedEncounterFromRow(row as unknown as Record<string, unknown>),
-        );
+        return (data ?? []).map(mapImportedEncounter);
       },
       fallback: () =>
         structuredClone(
@@ -44,18 +45,20 @@ export class ImportedEncounterRepository {
       scope: "ImportedEncounterRepository.findBySourceReference",
       remote: async (client) => {
         const { data, error } = await client
-          .from("imported_encounters")
-          .select("*")
-          .eq("source_reference", sourceReference)
-          .maybeSingle();
+          .from("clinical_encounters")
+          .select(
+            "id, patient_id, encounter_type, organisation, title, summary, raw_record, occurred_at, created_at, updated_at",
+          )
+          .order("occurred_at", { ascending: false });
 
         requireSuccessfulQuery(
           "ImportedEncounterRepository.findBySourceReference",
           error,
         );
-        return data
-          ? importedEncounterFromRow(data as unknown as Record<string, unknown>)
-          : null;
+        const encounter = (data ?? [])
+          .map(mapImportedEncounter)
+          .find((candidate) => candidate.sourceReference === sourceReference);
+        return encounter ?? null;
       },
       fallback: () => {
         const encounter = fallbackStore.importedEncounters.find(
@@ -71,17 +74,23 @@ export class ImportedEncounterRepository {
       scope: "ImportedEncounterRepository.save",
       remote: async (client) => {
         const { data, error } = await client
-          .from("imported_encounters")
-          .upsert(importedEncounterToRow(encounter), {
-            onConflict: "source_reference",
+          .from("clinical_encounters")
+          .upsert(clinicalEncounterInsertFromImportedEncounter(encounter), {
+            onConflict: "id",
           })
-          .select("*")
+          .select(
+            "id, patient_id, encounter_type, organisation, title, summary, raw_record, occurred_at, created_at, updated_at",
+          )
           .single();
 
         requireSuccessfulQuery("ImportedEncounterRepository.save", error);
-        return importedEncounterFromRow(
-          data as unknown as Record<string, unknown>,
-        );
+        if (!data) {
+          throw new RepositoryError(
+            "ImportedEncounterRepository.save",
+            "Supabase returned no clinical encounter row.",
+          );
+        }
+        return mapImportedEncounter(data);
       },
       fallback: () => {
         const index = fallbackStore.importedEncounters.findIndex(

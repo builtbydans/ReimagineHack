@@ -1,21 +1,21 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
-import type { TimelineEvent } from "@/server/types/domain";
-
 import { evidenceRepository } from "@/server/repositories/evidence-repository";
 import { fallbackStore } from "@/server/repositories/fallback-store";
 import {
-  timelineEventFromRow,
-  timelineEventToRow,
+  mapClinicalEncounterTimelineEvent,
+  mapPatientUpdateTimelineEvent,
+  patientUpdateInsertFromTimelineEvent,
 } from "@/server/repositories/mappers";
 import {
+  RepositoryError,
   requireSuccessfulQuery,
   withRepositoryFallback,
 } from "@/server/repositories/repository-support";
+import type { TimelineEvent } from "@/server/types/domain";
 
 const newestFirst = (left: TimelineEvent, right: TimelineEvent) =>
   Date.parse(right.recordedAt) - Date.parse(left.recordedAt);
@@ -32,45 +32,49 @@ const liveVoiceProjectionSchema = z.object({
   occurredAt: z.string().datetime({ offset: true }),
 });
 
+const patientUpdateSelect =
+  "id, patient_id, input_type, original_text, original_language, english_translation, processing_status, processing_error, occurred_at, created_at, updated_at" as const;
+const clinicalEncounterSelect =
+  "id, patient_id, encounter_type, organisation, title, summary, raw_record, occurred_at, created_at, updated_at" as const;
+
 export class TimelineRepository {
   async listByPatient(patientId: string): Promise<TimelineEvent[]> {
     return withRepositoryFallback({
       scope: "TimelineRepository.listByPatient",
       remote: async (client) => {
-        const { data, error } = await client
-          .from("timeline_events")
-          .select("*")
-          .eq("patient_id", patientId)
-          .order("recorded_at", { ascending: false });
-
-        requireSuccessfulQuery("TimelineRepository.listByPatient", error);
-        const rows = data ?? [];
-        const ids = rows.map((row) => String(row.id));
-        const [evidence, liveEvidence] = await Promise.all([
-          evidenceRepository.listForObservations(ids),
+        const [updatesResult, encountersResult, evidence] = await Promise.all([
+          client
+            .from("patient_updates")
+            .select(patientUpdateSelect)
+            .eq("patient_id", patientId)
+            .order("occurred_at", { ascending: false }),
+          client
+            .from("clinical_encounters")
+            .select(clinicalEncounterSelect)
+            .eq("patient_id", patientId)
+            .order("occurred_at", { ascending: false }),
           evidenceRepository.listLiveForPatient(patientId),
         ]);
 
-        return rows.map((row) => {
-          const id = String(row.id);
-          const structuredData =
-            row.structured_data && typeof row.structured_data === "object"
-              ? (row.structured_data as Record<string, unknown>)
-              : {};
-          const evidenceRecordId = structuredData.evidenceRecordId
-            ? String(structuredData.evidenceRecordId)
-            : undefined;
-          const attachedEvidence = [
-            ...evidence.filter((reference) => reference.observationId === id),
-            ...liveEvidence
-              .filter((reference) => reference.id === evidenceRecordId)
-              .map((reference) => ({ ...reference, observationId: id })),
-          ];
-          return timelineEventFromRow(
-            row as unknown as Record<string, unknown>,
-            attachedEvidence,
-          );
-        });
+        requireSuccessfulQuery(
+          "TimelineRepository.listByPatient.patient_updates",
+          updatesResult.error,
+        );
+        requireSuccessfulQuery(
+          "TimelineRepository.listByPatient.clinical_encounters",
+          encountersResult.error,
+        );
+
+        const updateEvents = (updatesResult.data ?? []).map((row) =>
+          mapPatientUpdateTimelineEvent(
+            row,
+            evidence.filter((reference) => reference.eventId === row.id),
+          ),
+        );
+        const encounterEvents = (encountersResult.data ?? []).map(
+          mapClinicalEncounterTimelineEvent,
+        );
+        return [...updateEvents, ...encounterEvents].sort(newestFirst);
       },
       fallback: () =>
         structuredClone(
@@ -85,20 +89,33 @@ export class TimelineRepository {
     return withRepositoryFallback({
       scope: "TimelineRepository.findById",
       remote: async (client) => {
-        const { data, error } = await client
-          .from("timeline_events")
-          .select("*")
-          .eq("id", eventId)
-          .maybeSingle();
-
-        requireSuccessfulQuery("TimelineRepository.findById", error);
-        if (!data) return null;
-
-        const evidence = await evidenceRepository.listForObservation(eventId);
-        return timelineEventFromRow(
-          data as unknown as Record<string, unknown>,
-          evidence,
+        const [updateResult, encounterResult] = await Promise.all([
+          client
+            .from("patient_updates")
+            .select(patientUpdateSelect)
+            .eq("id", eventId)
+            .maybeSingle(),
+          client
+            .from("clinical_encounters")
+            .select(clinicalEncounterSelect)
+            .eq("id", eventId)
+            .maybeSingle(),
+        ]);
+        requireSuccessfulQuery(
+          "TimelineRepository.findById.patient_updates",
+          updateResult.error,
         );
+        requireSuccessfulQuery(
+          "TimelineRepository.findById.clinical_encounters",
+          encounterResult.error,
+        );
+        if (updateResult.data) {
+          const evidence = await evidenceRepository.listForObservation(eventId);
+          return mapPatientUpdateTimelineEvent(updateResult.data, evidence);
+        }
+        return encounterResult.data
+          ? mapClinicalEncounterTimelineEvent(encounterResult.data)
+          : null;
       },
       fallback: () => {
         const event = fallbackStore.timelineEvents.find(
@@ -113,26 +130,34 @@ export class TimelineRepository {
     return withRepositoryFallback({
       scope: "TimelineRepository.save",
       remote: async (client) => {
+        if (event.sourceKind !== "patient_reported") {
+          throw new RepositoryError(
+            "TimelineRepository.save",
+            "The live schema can persist timeline projections only as patient_updates.",
+          );
+        }
         const { data, error } = await client
-          .from("timeline_events")
-          .upsert(timelineEventToRow(event), { onConflict: "id" })
-          .select("*")
+          .from("patient_updates")
+          .upsert(patientUpdateInsertFromTimelineEvent(event), {
+            onConflict: "id",
+          })
+          .select(patientUpdateSelect)
           .single();
-
         requireSuccessfulQuery("TimelineRepository.save", error);
-        return timelineEventFromRow(
-          data as unknown as Record<string, unknown>,
-          event.evidenceRefs,
-        );
+        if (!data) {
+          throw new RepositoryError(
+            "TimelineRepository.save",
+            "Supabase returned no patient update row.",
+          );
+        }
+        return mapPatientUpdateTimelineEvent(data, event.evidenceRefs);
       },
       fallback: () => {
         const index = fallbackStore.timelineEvents.findIndex(
           (candidate) => candidate.id === event.id,
         );
-
         if (index >= 0) fallbackStore.timelineEvents[index] = structuredClone(event);
         else fallbackStore.timelineEvents.push(structuredClone(event));
-
         return structuredClone(event);
       },
     });
@@ -144,73 +169,31 @@ export class TimelineRepository {
     const validated = liveVoiceProjectionSchema.parse(input);
     const client = getSupabaseAdmin();
     if (!client) {
-      throw new Error(
+      throw new RepositoryError(
+        "TimelineRepository.createLiveVoiceProjection",
         "SUPABASE_SECRET_KEY is not configured for timeline projection.",
       );
     }
-
-    const timelineEventId = randomUUID();
-    const metadata = {
-      synthetic: false,
-      enteredBy: "patient",
-      inputMode: "voice",
-      transcriptionProvider: "runware",
-      transcriptionMode: validated.transcriptionMode,
-    };
-    const event: TimelineEvent = {
-      id: timelineEventId,
-      patientId: validated.patientId,
-      type: "patient_voice",
-      title: "Patient voice update",
-      summary:
-        validated.englishTranslation ?? validated.originalTranscript,
-      recordedAt: validated.occurredAt,
-      sourceKind: "patient_reported",
-      location: "Home",
-      ...(validated.detectedLanguage
-        ? {
-            language:
-              validated.detectedLanguage.toLowerCase() === "urdu"
-                ? "ur"
-                : validated.detectedLanguage,
-          }
-        : {}),
-      originalText: validated.originalTranscript,
-      ...(validated.englishTranslation === undefined
-        ? {}
-        : { translatedText: validated.englishTranslation }),
-      metadata,
-      structuredData: {
-        patientUpdateId: validated.patientUpdateId,
-        evidenceRecordId: validated.evidenceRecordId,
-        metadata,
-      },
-    };
     const { data, error } = await client
-      .from("timeline_events")
-      .insert(timelineEventToRow(event))
-      .select("*")
-      .single();
-
-    if (error || !data || !z.string().uuid().safeParse(data.id).success) {
-      const { error: cleanupError } = await client
-        .from("timeline_events")
-        .delete()
-        .eq("id", timelineEventId)
-        .eq("patient_id", validated.patientId);
-      if (cleanupError) {
-        console.error(
-          "[Thread persistence] Failed to clean up timeline projection",
-          cleanupError,
-        );
-      }
-      requireSuccessfulQuery("TimelineRepository.createLiveVoiceProjection", error);
-      throw new Error("Supabase returned an invalid timeline projection row.");
-    }
-
-    return timelineEventFromRow(
-      data as unknown as Record<string, unknown>,
+      .from("patient_updates")
+      .select(patientUpdateSelect)
+      .eq("id", validated.patientUpdateId)
+      .eq("patient_id", validated.patientId)
+      .maybeSingle();
+    requireSuccessfulQuery(
+      "TimelineRepository.createLiveVoiceProjection",
+      error,
     );
+    if (!data) {
+      throw new RepositoryError(
+        "TimelineRepository.createLiveVoiceProjection",
+        `Patient update ${validated.patientUpdateId} was not found.`,
+      );
+    }
+    const evidence = await evidenceRepository.listForObservation(
+      validated.patientUpdateId,
+    );
+    return mapPatientUpdateTimelineEvent(data, evidence);
   }
 }
 

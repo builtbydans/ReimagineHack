@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getSupabase, getSupabaseAdmin } from "@/lib/supabase";
+import type { Database } from "@/types/database.types";
 
 const loggedWarnings = new Set<string>();
 let fallbackVersion = 0;
@@ -41,7 +42,7 @@ export const requireSuccessfulQuery = (
  */
 export async function withRepositoryFallback<T>(input: {
   scope: string;
-  remote: (client: SupabaseClient) => Promise<T>;
+  remote: (client: SupabaseClient<Database>) => Promise<T>;
   fallback: () => Promise<T> | T;
 }): Promise<T> {
   const supabase = getSupabaseAdmin() ?? getSupabase();

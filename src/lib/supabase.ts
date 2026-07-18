@@ -7,6 +7,7 @@ import {
   isSupabaseAdminConfigured,
   isSupabaseConfigured,
 } from "@/lib/env";
+import type { Database } from "@/types/database.types";
 
 const serverAuthOptions = {
   auth: {
@@ -20,19 +21,24 @@ const serverAuthOptions = {
  * The client is deliberately nullable: importing this module must remain safe
  * when the demo is running without credentials.
  */
-const supabase: SupabaseClient | null = isSupabaseConfigured
-  ? createClient(env.supabaseUrl!, env.supabaseKey!, serverAuthOptions)
+const supabase: SupabaseClient<Database> | null = isSupabaseConfigured
+  ? createClient<Database>(env.supabaseUrl!, env.supabaseKey!, serverAuthOptions)
   : null;
 
 /**
  * Elevated writes use a separate server-only client. The secret key bypasses
  * RLS and must never be imported into a client component or exposed publicly.
  */
-const supabaseAdmin: SupabaseClient | null = isSupabaseAdminConfigured
-  ? createClient(env.supabaseUrl!, env.supabaseSecretKey!, serverAuthOptions)
+const supabaseAdmin: SupabaseClient<Database> | null = isSupabaseAdminConfigured
+  ? createClient<Database>(
+      env.supabaseUrl!,
+      env.supabaseSecretKey!,
+      serverAuthOptions,
+    )
   : null;
 
-export const getSupabase = (): SupabaseClient | null => supabase;
-export const getSupabaseAdmin = (): SupabaseClient | null => supabaseAdmin;
+export const getSupabase = (): SupabaseClient<Database> | null => supabase;
+export const getSupabaseAdmin = (): SupabaseClient<Database> | null =>
+  supabaseAdmin;
 
 export default supabase;

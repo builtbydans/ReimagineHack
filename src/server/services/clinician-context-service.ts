@@ -3,6 +3,7 @@ import "server-only";
 import {
   demoPatient,
   seedAppointmentBrief,
+  seedEvidenceReferences,
   seedThreadObservation,
 } from "@/data/seed";
 import { getSupabaseAdmin } from "@/lib/supabase";
@@ -102,12 +103,20 @@ export class ClinicianContextService {
         importedEncounterRepository.listByPatient(patientId),
       ]);
     const resolvedBrief = appointmentBrief ?? structuredClone(seedAppointmentBrief);
+    const patientWithAppointment = {
+      ...resolvedPatient,
+      nextAppointment: resolvedBrief.appointment,
+    };
     const observation =
       observationFromTimeline(timelineEvents) ?? structuredClone(seedThreadObservation);
     const evidence = Array.from(
       new Map(
-        timelineEvents
-          .flatMap((event) => event.evidenceRefs ?? [])
+        [
+          ...timelineEvents.flatMap((event) => event.evidenceRefs ?? []),
+          ...seedEvidenceReferences.filter((reference) =>
+            resolvedBrief.evidenceIds.includes(reference.id),
+          ),
+        ]
           .map((reference) => [reference.id, reference]),
       ).values(),
     );
@@ -119,21 +128,18 @@ export class ClinicianContextService {
         ? "supabase"
         : "fallback";
 
-    if (dataSource === "supabase") {
-      console.info("[Thread data] Loaded clinician context from Supabase", {
-        patientId,
-        timelineEvents: timelineEvents.length,
-        evidence: evidence.length,
-        importedEncounters: importedEncounters.length,
-      });
-    } else {
-      console.warn("[Thread data] Supabase unavailable; using seeded fallback", {
-        patientId,
-      });
-    }
+    console.info("[Thread clinician data]", {
+      patientId,
+      patientFound: Boolean(patient),
+      timelineCount: timelineEvents.length,
+      briefFound: false,
+      encounterCount: importedEncounters.length,
+      evidenceCount: evidence.length,
+      source: dataSource,
+    });
 
     return {
-      patient: resolvedPatient,
+      patient: patientWithAppointment,
       timelineEvents,
       evidence,
       appointmentBrief: resolvedBrief,

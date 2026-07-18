@@ -8,9 +8,8 @@ import type { EvidenceRecord, EvidenceReference } from "@/server/types/domain";
 
 import { fallbackStore } from "@/server/repositories/fallback-store";
 import {
-  evidenceFromRow,
-  evidenceRecordFromRow,
-  liveEvidenceFromRow,
+  mapEvidenceRecord,
+  mapEvidenceReference,
 } from "@/server/repositories/mappers";
 import {
   RepositoryError,
@@ -32,21 +31,6 @@ const voiceTranscriptEvidenceInputSchema = z.object({
     .string()
     .datetime({ offset: true, message: "Use an ISO 8601 date and time." }),
 });
-
-const evidenceRecordRowSchema = z
-  .object({
-    id: z.string().uuid(),
-    patient_id: z.string().uuid(),
-    source_type: z.string(),
-    source_id: z.string().uuid().nullable(),
-    title: z.string(),
-    original_content: z.string(),
-    translated_content: z.string().nullable(),
-    occurred_at: z.string(),
-    metadata: z.record(z.string(), z.unknown()),
-    created_at: z.string(),
-  })
-  .passthrough();
 
 export type CreateVoiceTranscriptEvidenceInput = z.infer<
   typeof voiceTranscriptEvidenceInputSchema
@@ -90,8 +74,7 @@ export class EvidenceRepository {
       )
       .single();
 
-    const row = evidenceRecordRowSchema.safeParse(data);
-    if (error || !row.success) {
+    if (error || !data) {
       const { error: cleanupError } = await client
         .from("evidence_records")
         .delete()
@@ -113,7 +96,7 @@ export class EvidenceRepository {
       );
     }
 
-    return evidenceRecordFromRow(row.data);
+    return mapEvidenceRecord(data);
   }
 
   async listForObservation(observationId: string): Promise<EvidenceReference[]> {
@@ -121,15 +104,18 @@ export class EvidenceRepository {
       scope: "EvidenceRepository.listForObservation",
       remote: async (client) => {
         const { data, error } = await client
-          .from("evidence_references")
-          .select("*")
-          .eq("event_id", observationId)
-          .order("recorded_at", { ascending: true });
+          .from("evidence_records")
+          .select(
+            "id, patient_id, source_type, source_id, title, original_content, translated_content, occurred_at, metadata, created_at",
+          )
+          .eq("source_id", observationId)
+          .order("occurred_at", { ascending: true });
 
         requireSuccessfulQuery("EvidenceRepository.listForObservation", error);
-        return (data ?? []).map((row) =>
-          evidenceFromRow(row as unknown as Record<string, unknown>),
-        );
+        return (data ?? []).map((row) => ({
+          ...mapEvidenceReference(row),
+          observationId,
+        }));
       },
       fallback: () =>
         structuredClone(
@@ -154,9 +140,7 @@ export class EvidenceRepository {
           .order("occurred_at", { ascending: false });
 
         requireSuccessfulQuery("EvidenceRepository.listLiveForPatient", error);
-        return (data ?? []).map((row) =>
-          liveEvidenceFromRow(row as unknown as Record<string, unknown>),
-        );
+        return (data ?? []).map(mapEvidenceReference);
       },
       fallback: () => [],
     });
@@ -171,15 +155,18 @@ export class EvidenceRepository {
       scope: "EvidenceRepository.listForObservations",
       remote: async (client) => {
         const { data, error } = await client
-          .from("evidence_references")
-          .select("*")
-          .in("event_id", observationIds)
-          .order("recorded_at", { ascending: true });
+          .from("evidence_records")
+          .select(
+            "id, patient_id, source_type, source_id, title, original_content, translated_content, occurred_at, metadata, created_at",
+          )
+          .in("source_id", observationIds)
+          .order("occurred_at", { ascending: true });
 
         requireSuccessfulQuery("EvidenceRepository.listForObservations", error);
-        return (data ?? []).map((row) =>
-          evidenceFromRow(row as unknown as Record<string, unknown>),
-        );
+        return (data ?? []).map((row) => ({
+          ...mapEvidenceReference(row),
+          ...(row.source_id ? { observationId: row.source_id } : {}),
+        }));
       },
       fallback: () => {
         const wanted = new Set(observationIds);

@@ -3,8 +3,9 @@ import "server-only";
 import { demoPatient } from "@/data/seed";
 import type { Patient } from "@/server/types/domain";
 
-import { patientFromRow } from "@/server/repositories/mappers";
+import { mapPatient } from "@/server/repositories/mappers";
 import {
+  RepositoryError,
   requireSuccessfulQuery,
   withRepositoryFallback,
 } from "@/server/repositories/repository-support";
@@ -16,14 +17,20 @@ export class PatientRepository {
       remote: async (client) => {
         const { data, error } = await client
           .from("patients")
-          .select("*")
+          .select(
+            "id, full_name, date_of_birth, primary_condition, preferred_language, created_at, updated_at",
+          )
           .eq("id", patientId)
           .maybeSingle();
 
         requireSuccessfulQuery("PatientRepository.findById", error);
-        return data
-          ? patientFromRow(data as unknown as Record<string, unknown>)
-          : null;
+        if (!data) {
+          throw new RepositoryError(
+            "PatientRepository",
+            `Patient ${patientId} was not found.`,
+          );
+        }
+        return mapPatient(data);
       },
       fallback: () =>
         patientId === demoPatient.id ? structuredClone(demoPatient) : null,
@@ -32,4 +39,3 @@ export class PatientRepository {
 }
 
 export const patientRepository = new PatientRepository();
-

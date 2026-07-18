@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getSupabaseAdmin } from "@/lib/supabase";
-import { patientUpdateFromRow } from "@/server/repositories/mappers";
+import { mapPatientUpdate } from "@/server/repositories/mappers";
 import {
   RepositoryError,
   requireSuccessfulQuery,
@@ -97,7 +97,7 @@ export class PatientUpdateRepository {
       );
     }
 
-    return patientUpdateFromRow(row.data);
+    return mapPatientUpdate(row.data);
   }
 
   async deleteById(patientUpdateId: string, patientId: string): Promise<void> {

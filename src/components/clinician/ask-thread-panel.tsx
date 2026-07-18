@@ -187,6 +187,7 @@ function PreparedBriefing({
   ].filter((candidate) => candidate !== undefined);
   const changesSinceLastGp = section("changes_since_last_review")?.items ?? [];
   const discussionPoints = section("patient_questions")?.items ?? [];
+  const patientFirstName = patient.name.split(" ")[0];
 
   return (
     <article className="rounded-[1.35rem] bg-white px-5 py-6 shadow-card sm:px-7 sm:py-7" aria-labelledby="prepared-briefing-heading">
@@ -196,18 +197,17 @@ function PreparedBriefing({
             Prepared briefing
           </p>
           <h2 id="prepared-briefing-heading" className="mt-2 text-xl font-semibold tracking-[-.035em] sm:text-2xl">
-            Here’s what to know before seeing {patient.name}
+            Here’s what to know before seeing {patientFirstName}
           </h2>
         </div>
         <Badge variant="ai" className="bg-amber-50/70">AI-organised</Badge>
       </div>
 
-      <div className="mt-5 max-w-3xl space-y-4 text-sm leading-6 text-foreground/90">
+      <div className="mt-5 max-w-3xl space-y-3 text-sm leading-6 text-foreground/90">
         {narrativeSections.flatMap((briefSection) =>
           briefSection.items.map((item) => (
             <div key={item.id} className="flex items-start gap-2">
               <p className="flex-1">
-                <span className="font-semibold">{briefSection.title}: </span>
                 {item.text}
               </p>
               <EvidenceLink
@@ -238,7 +238,7 @@ function PreparedBriefing({
 
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-1">
           <section aria-labelledby="discuss-heading">
-            <h3 id="discuss-heading" className="text-sm font-semibold">{patient.name} wants to discuss</h3>
+            <h3 id="discuss-heading" className="text-sm font-semibold">{patientFirstName} wants to discuss</h3>
             <ul className="mt-3 space-y-2 text-sm leading-5">
               {discussionPoints.map((item) => (
                 <li key={item.id} className="flex gap-2">
