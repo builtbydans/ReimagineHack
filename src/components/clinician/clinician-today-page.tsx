@@ -75,7 +75,10 @@ function NextPatientRow({
           <p className="mt-1 text-xs text-white/65">
             Age {appointment.age} · {appointment.condition} · Last GP encounter {appointment.lastEncounter}
           </p>
-          <p className="mt-3 max-w-2xl text-sm leading-5 text-white/90">
+          <p className="mt-3 text-sm font-semibold text-white">
+            {appointment.reason}
+          </p>
+          <p className="mt-1 max-w-2xl text-sm leading-5 text-white/75">
             {appointment.context}
           </p>
         </div>
@@ -161,4 +164,3 @@ export function ClinicianTodayPage() {
     </div>
   );
 }
-

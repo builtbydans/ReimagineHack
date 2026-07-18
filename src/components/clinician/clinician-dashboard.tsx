@@ -327,7 +327,7 @@ function ClinicalInvestigation({ events, uclhEncounter, encounterForDetails, ope
   );
 }
 
-export function ClinicianDashboard({ mode = "summary" }: { mode?: ClinicianMode }) {
+export function ClinicianDashboard({ mode = "summary" }: { mode?: Exclude<ClinicianMode, "today"> }) {
   const { events, addEvent } = useDemoData();
   const [evidenceState, setEvidenceState] = React.useState<EvidenceState | null>(null);
   const [encounterEvent, setEncounterEvent] = React.useState<TimelineEvent | null>(null);

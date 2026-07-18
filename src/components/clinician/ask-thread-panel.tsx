@@ -220,15 +220,24 @@ function PreparedBriefing({
       </div>
 
       <div className="mt-5 max-w-3xl space-y-3 text-sm leading-6 text-foreground/90">
-        <p>
-          Amina is 32 and has a recorded diagnosis of endometriosis. Since her last GP appointment on 4 June, she has reported worsening pelvic and lower-back pain, increasing from 6/10 to 8/10. Pain is now interrupting her sleep and has caused her to leave work early twice.
-        </p>
-        <p>
-          She attended UCLH A&amp;E on 17 May following a severe pain episode. Observations were stable, displayed blood results were within range, and she was discharged with GP follow-up advice.
-        </p>
-        <p>
-          Naproxen provides some relief but has caused nausea, and she later avoided a dose. Her gynaecology review is booked for 24 July.
-        </p>
+        <div className="flex items-start gap-2">
+          <p className="flex-1">
+            Amina is 32 and has a recorded diagnosis of endometriosis. Since her last GP appointment on 4 June, she has reported worsening pelvic and lower-back pain, increasing from 6/10 to 8/10. Pain is now interrupting her sleep and has caused her to leave work early twice.
+          </p>
+          <EvidenceLink label="Amina’s recent pain, sleep and work changes" evidenceIds={[EVIDENCE_IDS.secondEarlyDeparture, EVIDENCE_IDS.julyPainAndSleep, EVIDENCE_IDS.juneSleep]} openEvidence={openEvidence} />
+        </div>
+        <div className="flex items-start gap-2">
+          <p className="flex-1">
+            She attended UCLH A&amp;E on 17 May following a severe pain episode. Observations were stable, displayed blood results were within range, and she was discharged with GP follow-up advice.
+          </p>
+          <EvidenceLink label="Amina’s 17 May UCLH A&E attendance" evidenceIds={[EVIDENCE_IDS.emergencyReason, EVIDENCE_IDS.emergencyObservations, EVIDENCE_IDS.emergencyBloods, EVIDENCE_IDS.emergencyDisposition, EVIDENCE_IDS.emergencyFollowUp]} openEvidence={openEvidence} />
+        </div>
+        <div className="flex items-start gap-2">
+          <p className="flex-1">
+            Naproxen provides some relief but has caused nausea, and she later avoided a dose. Her gynaecology review is booked for 24 July.
+          </p>
+          <EvidenceLink label="Naproxen effects and booked gynaecology review" evidenceIds={[EVIDENCE_IDS.aprilMedicationRelief, EVIDENCE_IDS.medicationNausea, EVIDENCE_IDS.avoidedMedication, EVIDENCE_IDS.appointmentBooked]} openEvidence={openEvidence} />
+        </div>
       </div>
 
       <div className="mt-7 grid gap-7 border-t pt-6 lg:grid-cols-[1.35fr_.9fr]">
