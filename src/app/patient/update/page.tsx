@@ -55,6 +55,9 @@ type TranscriptionPreview = {
   englishTranslation?: string;
   mode: "fallback" | "runware";
   notice?: string;
+  patientUpdateId?: string;
+  evidenceId?: string;
+  persisted?: boolean;
 };
 
 type PatientUpdateSubmission = {
@@ -753,6 +756,11 @@ export default function PatientUpdatePage() {
                     {transcription.notice ? (
                       <p className="mt-4 rounded-xl bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-900">
                         {transcription.notice}
+                      </p>
+                    ) : null}
+                    {transcription.persisted === true ? (
+                      <p className="mt-4 rounded-xl bg-white px-3 py-2 text-[11px] font-medium leading-5 text-sage-800">
+                        Your update has been added to your health story.
                       </p>
                     ) : null}
                   </div>

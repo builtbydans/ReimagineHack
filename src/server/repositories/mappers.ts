@@ -5,9 +5,11 @@ import type {
   AppointmentBrief,
   AppointmentBriefSection,
   EncounterDetails,
+  EvidenceRecord,
   EvidenceReference,
   ImportedEncounter,
   Patient,
+  PatientUpdate,
   TimelineEvent,
 } from "@/server/types/domain";
 
@@ -102,6 +104,37 @@ export const patientFromRow = (row: JsonObject): Patient => ({
   ...(demoPatient.id === row.id && demoPatient.nextAppointment
     ? { nextAppointment: demoPatient.nextAppointment }
     : {}),
+});
+
+export const patientUpdateFromRow = (row: JsonObject): PatientUpdate => ({
+  id: String(row.id),
+  patientId: String(row.patient_id),
+  inputType: row.input_type as PatientUpdate["inputType"],
+  originalText: String(row.original_text),
+  originalLanguage: String(row.original_language),
+  englishTranslation:
+    row.english_translation == null ? null : String(row.english_translation),
+  processingStatus:
+    row.processing_status as PatientUpdate["processingStatus"],
+  processingError:
+    row.processing_error == null ? null : String(row.processing_error),
+  occurredAt: String(row.occurred_at),
+  createdAt: String(row.created_at),
+  updatedAt: String(row.updated_at),
+});
+
+export const evidenceRecordFromRow = (row: JsonObject): EvidenceRecord => ({
+  id: String(row.id),
+  patientId: String(row.patient_id),
+  sourceType: String(row.source_type),
+  sourceId: row.source_id == null ? null : String(row.source_id),
+  title: String(row.title),
+  originalContent: String(row.original_content),
+  translatedContent:
+    row.translated_content == null ? null : String(row.translated_content),
+  occurredAt: String(row.occurred_at),
+  metadata: objectValue(row.metadata),
+  createdAt: String(row.created_at),
 });
 
 export const evidenceFromRow = (row: JsonObject): EvidenceReference => ({

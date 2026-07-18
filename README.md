@@ -143,6 +143,7 @@ The app starts successfully with every value empty.
 ```bash
 SUPABASE_URL=
 SUPABASE_KEY=
+SUPABASE_SECRET_KEY=
 
 GEMINI_API_KEY=
 RUNWARE_API_KEY=
@@ -150,7 +151,8 @@ RUNWARE_API_KEY=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-- `SUPABASE_URL` and `SUPABASE_KEY` are read only by server-side modules. Use an appropriately scoped server credential for the prototype; production requires a complete authentication and authorization design.
+- `SUPABASE_URL` and `SUPABASE_KEY` configure the existing RLS-aware repository client. `SUPABASE_KEY` may be a publishable key.
+- `SUPABASE_SECRET_KEY` configures the separate server-only client used for trusted transcription writes. It must be a Supabase secret key (`sb_secret_...`) that bypasses RLS. The legacy `SUPABASE_SERVICE_ROLE_KEY` name is also supported.
 - `GEMINI_API_KEY` belongs to the server-side health extraction service.
 - `RUNWARE_API_KEY` belongs to the server-side transcription service.
 - `NEXT_PUBLIC_APP_URL` is safe to expose and defaults to `http://localhost:3000`.
@@ -163,7 +165,7 @@ NEXT_PUBLIC_APP_URL=http://localhost:3000
 2. Open the SQL editor.
 3. Run [`supabase/schema.sql`](supabase/schema.sql) to create the tables, constraints, indexes, and updated-at helpers.
 4. Run [`supabase/seed.sql`](supabase/seed.sql) to load the synthetic Amina scenario.
-5. Add the project URL and suitable server key to `.env`.
+5. Add the project URL, publishable key, and server-only secret key to `.env`.
 6. Restart the Next.js process.
 
 The schema includes:

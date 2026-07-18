@@ -18,6 +18,9 @@ const booleanFlag = (value: string | undefined, fallback: boolean) => {
 export const env = {
   supabaseUrl: optional(process.env.SUPABASE_URL),
   supabaseKey: optional(process.env.SUPABASE_KEY),
+  supabaseSecretKey:
+    optional(process.env.SUPABASE_SECRET_KEY) ??
+    optional(process.env.SUPABASE_SERVICE_ROLE_KEY),
   geminiApiKey: optional(process.env.GEMINI_API_KEY),
   runwareApiKey: optional(process.env.RUNWARE_API_KEY),
   transcriptionFallbackEnabled: booleanFlag(
@@ -31,6 +34,10 @@ export const env = {
 
 export const isSupabaseConfigured = Boolean(
   env.supabaseUrl && env.supabaseKey,
+);
+
+export const isSupabaseAdminConfigured = Boolean(
+  env.supabaseUrl && env.supabaseSecretKey,
 );
 
 export const isGeminiConfigured = Boolean(env.geminiApiKey);

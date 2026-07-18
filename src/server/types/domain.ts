@@ -142,6 +142,33 @@ export interface Patient {
   nextAppointment?: AppointmentDetails;
 }
 
+export interface PatientUpdate {
+  id: string;
+  patientId: string;
+  inputType: "voice" | "text" | "symptom" | "medication";
+  originalText: string;
+  originalLanguage: string;
+  englishTranslation: string | null;
+  processingStatus: "pending" | "processing" | "completed" | "failed";
+  processingError: string | null;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvidenceRecord {
+  id: string;
+  patientId: string;
+  sourceType: string;
+  sourceId: string | null;
+  title: string;
+  originalContent: string;
+  translatedContent: string | null;
+  occurredAt: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface EvidenceSentenceReference {
   id: string;
   sentence: string;
